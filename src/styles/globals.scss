@@ -1,0 +1,122 @@
+@use 'theme';
+@use 'typography';
+@use 'mixins';
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--md-sys-typescale-body-medium-font);
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+// Inputs e campos arredondados (aplica a todos os md-filled-text-field)
+md-filled-text-field {
+  --md-filled-text-field-container-shape: 12px;
+  --md-filled-text-field-input-text-font: 'Roboto', sans-serif;
+  transition: box-shadow 0.2s, transform 0.1s;
+}
+
+md-filled-text-field:focus-within {
+  box-shadow: 0 0 0 2px var(--md-sys-color-primary);
+}
+
+// Select personalizado (usado no mecânico)
+select {
+  background-color: var(--md-sys-color-surface-variant);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 1rem;
+  color: var(--md-sys-color-on-surface);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:focus {
+    border-color: var(--md-sys-color-primary);
+    box-shadow: 0 0 0 2px var(--md-sys-color-primary);
+  }
+}
+
+// Cards com efeito de toque
+.card-interactive {
+  transition: transform 0.2s, box-shadow 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: var(--md-sys-elevation-2);
+  }
+}
+
+/* Overlay da modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(6px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+/* Cartão da modal */
+.modal-card {
+  background: var(--md-sys-color-surface);
+  border-radius: var(--md-sys-shape-corner-large);
+  box-shadow: var(--md-sys-elevation-3);
+  padding: 24px;
+  max-width: 90vw;
+  width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: modalPop 0.25s cubic-bezier(0.2, 0, 0, 1);
+}
+/* Botão fechar */
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--md-sys-color-on-surface);
+  padding: 4px;
+}
+/* Animações */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

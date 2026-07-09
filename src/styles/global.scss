@@ -1,0 +1,67 @@
+@use 'theme';
+@use 'typography';
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--md-sys-typescale-body-medium-font);
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  // Bloquear zoom em tablets (desejável para apps)
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+// Garante que todos os elementos interativos do MD3 tenham transições suaves
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+// Força a exibição do ripple nos botões
+md-filled-button,
+md-outlined-button,
+md-text-button,
+md-elevated-button,
+md-filled-tonal-button {
+  --md-ripple-hover-color: var(--md-sys-color-primary);
+  --md-ripple-pressed-color: var(--md-sys-color-primary);
+  --md-ripple-hover-opacity: 0.08;
+  --md-ripple-pressed-opacity: 0.12;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden; // crucial para o ripple não vazar
+}
+
+// Efeito de pressionamento leve (opcional, mas dá feedback tátil extra)
+md-filled-button:active,
+md-outlined-button:active,
+md-text-button:active,
+md-elevated-button:active {
+  transform: scale(0.96);
+}
+
+// Ajusta os estados de foco e hover para os botões filled
+md-filled-button {
+  --_container-color: var(--md-sys-color-primary);
+  --_container-hover-color: var(--md-sys-color-primary);
+  --_container-pressed-color: var(--md-sys-color-primary);
+  --_container-hover-opacity: 0.9;
+  --_container-pressed-opacity: 0.8;
+}
+
+// Outlined buttons: mantém a borda no hover/pressed
+md-outlined-button {
+  --_outline-color: var(--md-sys-color-primary);
+  --_outline-hover-color: var(--md-sys-color-primary);
+  --_outline-pressed-color: var(--md-sys-color-primary);
+  --_label-text-color: var(--md-sys-color-primary);
+  --_label-text-hover-color: var(--md-sys-color-primary);
+  --_label-text-pressed-color: var(--md-sys-color-primary);
+}

@@ -1,0 +1,51 @@
+/* Stepper buttons */
+.stepper-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background-color: transparent;
+  color: var(--md-sys-color-primary);
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.stepper-btn:hover {
+  background-color: var(--md-sys-color-primary-container);
+}
+
+/* Toggle switch estilo MD3 */
+.toggle-switch {
+  position: relative;
+  width: 52px;
+  height: 32px;
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface-variant);
+  border: 2px solid var(--md-sys-color-outline);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+}
+.toggle-switch.active {
+  background-color: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+}
+
+.toggle-thumb {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  margin-left: 2px;
+  transition: transform 0.2s ease;
+}
+.toggle-switch.active .toggle-thumb {
+  transform: translateX(20px);
+}

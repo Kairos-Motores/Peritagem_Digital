@@ -1,0 +1,15 @@
+@mixin mobile-only {
+  @media (max-width: 600px) { @content; }
+}
+
+@mixin tablet-only {
+  @media (min-width: 601px) and (max-width: 1024px) { @content; }
+}
+
+@mixin no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
