@@ -59,6 +59,7 @@ export default function Home() {
               peritador: cab.cr4a1_peritador,
               status: cab.cr4a1_status,
               percentual: concluido ? 100 : percentual,
+              temFotos: cab.cr4a1_tem_fotos,
               concluido,
             };
           });
@@ -73,7 +74,6 @@ export default function Home() {
     fetchData();
   }, [username]);
 
-  // Handlers de toque longo (funcionam tanto em touch quanto em mouse)
   const handlePressStart = useCallback((os) => {
     isLongPress.current = false;
     longPressTimer.current = setTimeout(() => {
@@ -85,14 +85,11 @@ export default function Home() {
   const handlePressEnd = useCallback((os, e) => {
     clearTimeout(longPressTimer.current);
     if (!isLongPress.current) {
-      // Toque curto → navega (impede que o onClick nativo do mouse dispare também)
       e?.preventDefault();
       navigate(`/inspecao/${encodeURIComponent(os)}`);
     }
-    // Se foi longo, o modal já foi aberto pelo timer
   }, [navigate]);
 
-  // Para desktop, usamos mouse events
   const handleMouseDown = useCallback((os) => {
     handlePressStart(os);
   }, [handlePressStart]);
@@ -128,20 +125,12 @@ export default function Home() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <TopBar title="Kairós Peritagem" showBack={false} logoSrc={Logo} />
-      <div
-        style={{
-          padding: 16,
-          flex: 1,
-          overflowY: 'auto',
-          paddingBottom: 120,   // espaço extra para não cobrir os últimos cards
-          boxSizing: 'border-box',
-        }}
-      >
+      <div className="page-content" style={{ paddingBottom: 100 }}>
         <motion.h1
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          style={{ color: 'var(--md-sys-color-on-background)' }}
+          style={{ color: 'var(--md-sys-color-on-background)', fontSize: '1.5rem' }}
         >
           Bem-vindo, {dadosUsuario?.cr4a1_title || username}
         </motion.h1>
@@ -158,7 +147,7 @@ export default function Home() {
           </FilledButton>
         </motion.div>
 
-        <h2 style={{ color: 'var(--md-sys-color-on-background)' }}>Inspeções</h2>
+        <h2 style={{ color: 'var(--md-sys-color-on-background)', fontSize: '1.1rem' }}>Inspeções</h2>
 
         <motion.div layout style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           {cards.length === 0 && <p>Nenhuma inspeção encontrada.</p>}
@@ -178,18 +167,16 @@ export default function Home() {
                 }}
                 whileHover={{ scale: 1.02, y: -2, boxShadow: 'var(--md-sys-elevation-3)' }}
                 whileTap={{ scale: 0.98, boxShadow: 'var(--md-sys-elevation-2)' }}
-                // Eventos de toque e mouse para suportar ambos os ambientes
                 onTouchStartCapture={() => handlePressStart(card.os)}
                 onTouchEndCapture={(e) => handlePressEnd(card.os, e)}
                 onMouseDownCapture={() => handleMouseDown(card.os)}
                 onMouseUpCapture={(e) => handleMouseUp(card.os, e)}
-                // Previne o comportamento padrão de arrastar no tablet
                 style={{
                   flex: '1 1 calc(50% - 12px)',
-                  minWidth: '220px',
+                  minWidth: '180px',
                   backgroundColor: card.concluido ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-surface)',
                   color: card.concluido ? '#FFFFFF' : 'var(--md-sys-color-on-surface)',
-                  padding: 16,
+                  padding: 12,
                   borderRadius: 'var(--md-sys-shape-corner-medium)',
                   boxShadow: 'var(--md-sys-elevation-1)',
                   cursor: 'pointer',
@@ -198,13 +185,21 @@ export default function Home() {
                   justifyContent: 'space-between',
                   position: 'relative',
                   overflow: 'hidden',
-                  touchAction: 'manipulation',   // <-- essencial para o toque funcionar
+                  touchAction: 'manipulation',
+                  fontSize: '0.875rem',
                 }}
               >
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <strong style={{ fontSize: '1rem' }}>OS: {card.os}</strong>
-                    {card.concluido && <span style={{ fontSize: '0.75rem' }}>✓ Concluída</span>}
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      {card.temFotos && (
+                        <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: 'var(--md-sys-color-primary)' }}>
+                          image
+                        </span>
+                      )}
+                      {card.concluido && <span style={{ fontSize: '0.75rem' }}>✓ Concluída</span>}
+                    </div>
                   </div>
                   <p style={{ fontSize: '0.875rem', opacity: 0.8, marginBottom: 12 }}>
                     {card.peritador || 'N/D'}

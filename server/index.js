@@ -195,7 +195,6 @@ app.post('/api/dataverse', async (req, res) => {
   }
 });
 
-// Endpoint de upload de foto
 // Endpoint de upload de foto (busca dinâmica do drive "Doc Técnicos")
 app.post('/api/upload-foto', async (req, res) => {
   const { os, fotoBase64, nomeArquivo } = req.body;
@@ -314,6 +313,83 @@ app.post('/api/upload-foto', async (req, res) => {
 
   } catch (error) {
     console.error('Erro no upload:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Endpoint para listar fotos de uma OS
+app.get('/api/fotos', async (req, res) => {
+  const { os } = req.query;
+  if (!os) return res.status(400).json({ message: 'OS é obrigatória' });
+
+  // Verifica token de sessão (JWT) para segurança
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Token não fornecido' });
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return res.status(401).json({ message: 'Token inválido' });
+  }
+
+  try {
+    // 1. Buscar cabeçalho para obter filial e cliente
+    const cabSet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
+    const tokenDV = await getAccessToken();
+    const cabRes = await fetch(
+      `${process.env.DATAVERSE_ENV_URL}/api/data/v9.2/${cabSet}?$filter=cr4a1_os eq '${encodeURIComponent(os)}'&$select=cr4a1_filial,cr4a1_cliente`,
+      { headers: { Authorization: `Bearer ${tokenDV}`, Accept: 'application/json' } }
+    );
+    const cabData = await cabRes.json();
+    const cab = cabData.value?.[0];
+    if (!cab) return res.status(404).json({ message: 'Cabeçalho não encontrado' });
+
+    const filial = cab.cr4a1_filial || 'SemFilial';
+    const cliente = cab.cr4a1_cliente || 'SemCliente';
+
+    // 2. Token do Graph
+    const graphToken = await getGraphToken();
+
+    // 3. Localizar o drive "Doc Técnicos"
+    const drivesUrl = `https://graph.microsoft.com/v1.0/sites/${SHAREPOINT_SITE_ID}/drives`;
+    const drivesRes = await fetch(drivesUrl, {
+      headers: { Authorization: `Bearer ${graphToken}` },
+    });
+    const drivesData = await drivesRes.json();
+    const drive = drivesData.value.find(
+      d => d.name === 'Doc Técnicos' || d.webUrl.includes('Doc%20Tcnicos')
+    );
+    if (!drive) return res.status(404).json({ message: 'Biblioteca não encontrada' });
+
+    // 4. Montar caminho da pasta
+    const folderPath = `Fotos Peritagens/${filial}/${cliente}/${os}/Peritagem`;
+    const encodedPath = folderPath.split('/').map(encodeURIComponent).join('/');
+    const listUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encodedPath}:/children`;
+
+    const listRes = await fetch(listUrl, {
+      headers: { Authorization: `Bearer ${graphToken}` },
+    });
+    if (!listRes.ok) {
+      // Pasta pode não existir (sem fotos), retorna array vazio
+      if (listRes.status === 404) return res.json([]);
+      throw new Error(`Erro ao listar fotos: ${await listRes.text()}`);
+    }
+
+    const listData = await listRes.json();
+    const fotos = listData.value
+      .filter(item => item.file && item.file.mimeType?.startsWith('image/'))
+      .map(item => ({
+        id: item.id,
+        name: item.name,
+        url: item.webUrl,
+        thumbnailUrl: item.thumbnails?.[0]?.medium?.url || item.webUrl,
+      }));
+
+    res.json(fotos);
+  } catch (error) {
+    console.error('Erro ao listar fotos:', error);
     res.status(500).json({ message: error.message });
   }
 });

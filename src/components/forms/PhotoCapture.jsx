@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
-import { FilledButton } from '../ui/MdButton';
 import { useToast } from '../../hooks/useToast';
+import './PhotoCapture.css';
 
 export default function PhotoCapture({ onCapture }) {
   const fileRef = useRef();
@@ -28,10 +28,15 @@ export default function PhotoCapture({ onCapture }) {
   };
 
   return (
-    <div style={{ marginTop: 16, textAlign: 'center' }}>
-      <FilledButton onClick={() => fileRef.current.click()} disabled={enviando}>
-        {enviando ? 'Enviando...' : 'Tirar Foto'}
-      </FilledButton>
+    <div style={{ textAlign: 'center', marginTop: 16 }}>
+      <button
+        onClick={() => fileRef.current?.click()}
+        disabled={enviando}
+        className="photo-btn"
+        aria-label="Tirar foto"
+      >
+        <span className="material-symbols-outlined">photo_camera</span>
+      </button>
       <input
         ref={fileRef}
         type="file"

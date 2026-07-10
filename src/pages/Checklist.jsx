@@ -11,7 +11,7 @@ import { db } from '../db/fila';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import { useToast } from '../hooks/useToast';
 import { AnimatePresence, motion } from 'framer-motion';
-import Logo from "../assets/Medro llogo horizontal-Medro.svg";
+import Logo from '../assets/Medro llogo horizontal-Medro.svg';
 
 export default function Checklist() {
   const { inspecaoAtual } = useInspecao();
@@ -115,8 +115,6 @@ export default function Checklist() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
       <TopBar title={`OS: ${os}`} logoSrc={Logo} />
-      
-      {/* Barra de tipos com animação */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -134,12 +132,16 @@ export default function Checklist() {
               whileTap={{ scale: 0.95 }}
               transition={{ type: 'spring', stiffness: 400, damping: 15 }}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 14px', borderRadius: 20, border: '1px solid var(--md-sys-color-outline)',
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '4px 12px',
+                borderRadius: 20,
+                border: '1px solid var(--md-sys-color-outline)',
                 backgroundColor: tipo === tipoSelecionado ? 'var(--md-sys-color-primary)' : salvo ? 'var(--md-sys-color-primary-container)' : 'transparent',
                 color: tipo === tipoSelecionado ? '#fff' : salvo ? 'var(--md-sys-color-on-primary-container)' : 'var(--md-sys-color-on-surface)',
                 fontWeight: tipo === tipoSelecionado ? 600 : 400,
-                cursor: 'pointer', whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                fontSize: '0.8rem',
                 boxShadow: tipo === tipoSelecionado ? 'var(--md-sys-elevation-1)' : 'none'
               }}
             >
@@ -150,9 +152,7 @@ export default function Checklist() {
           );
         })}
       </motion.div>
-
-      {/* Itens do tipo selecionado com transição animada */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+      <div className="page-content">
         <AnimatePresence mode="wait">
           <motion.div
             key={tipoSelecionado}
@@ -167,19 +167,26 @@ export default function Checklist() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Botão de salvar tipo */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.3 }}
           style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}
         >
-          <OutlinedButton onClick={handleSalvarTipo} disabled={salvando}>
+          <OutlinedButton
+            onClick={handleSalvarTipo}
+            disabled={salvando}
+            style={{
+              padding: '8px 20px',
+              minWidth: 0,
+              fontSize: '0.875rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {salvando ? 'Salvando...' : `Salvar "${tipoSelecionado}"`}
           </OutlinedButton>
         </motion.div>
 
-        {/* Seção de mídia e conclusão */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -202,8 +209,6 @@ export default function Checklist() {
               const data = await res.json();
             }}
           />
-          <FilledButton style={{ marginTop: 12 }} onClick={() => setShowSignature(true)}>Assinar Inspeção</FilledButton>
-          {showSignature && <SignaturePad onSave={(data) => { setAssinatura(data); setShowSignature(false); }} />}
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <FilledButton
               style={{ width: '100%', marginTop: 16 }}

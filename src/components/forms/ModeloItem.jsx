@@ -4,11 +4,7 @@ import './ModeloItem.css';
 
 export default function ModeloItem({ item, onChange, initialResposta }) {
   const { cr4a1_item, cr4a1_descricao, cr4a1_var_quant, cr4a1_referencia } = item;
-  const opcoes = cr4a1_var_quant
-    ? cr4a1_var_quant.split(';').map(s => s.trim()).filter(Boolean)
-    : [];
-
-  // Binário quando exatamente duas opções
+  const opcoes = cr4a1_var_quant ? cr4a1_var_quant.split(';').map(s => s.trim()).filter(Boolean) : [];
   const isBinario = opcoes.length === 2;
 
   const [estado, setEstado] = useState(() => {
@@ -32,7 +28,6 @@ export default function ModeloItem({ item, onChange, initialResposta }) {
     onChange({ item_id: cr4a1_item, observacao: obs, quantidades: est });
   };
 
-  // Alterna entre as duas opções: a ativa fica 0, a outra fica 1
   const toggleBinario = () => {
     const [op1, op2] = opcoes;
     const novo = estado[op1] > 0 ? { [op1]: 0, [op2]: 1 } : { [op1]: 1, [op2]: 0 };
@@ -40,7 +35,6 @@ export default function ModeloItem({ item, onChange, initialResposta }) {
     propagar(novo, undefined);
   };
 
-  // Steppers (para 1 ou 3+ opções)
   const increment = (op) => {
     const novo = { ...estado, [op]: (estado[op] || 0) + 1 };
     setEstado(novo);
@@ -55,18 +49,17 @@ export default function ModeloItem({ item, onChange, initialResposta }) {
   const opcaoAtiva = isBinario ? (estado[opcoes[0]] > 0 ? opcoes[0] : opcoes[1]) : null;
 
   return (
-    <FilledCard className="card-interactive" style={{ marginBottom: 16, padding: 20, backgroundColor: 'var(--md-sys-color-surface)' }}>
-      <h4 style={{ margin: '0 0 4px', color: 'var(--md-sys-color-on-surface)' }}>{cr4a1_descricao}</h4>
+    <FilledCard className="card-interactive" style={{ marginBottom: 12, padding: 16, backgroundColor: 'var(--md-sys-color-surface)' }}>
+      <h4 style={{ margin: '0 0 2px', color: 'var(--md-sys-color-on-surface)', fontSize: '0.95rem' }}>{cr4a1_descricao}</h4>
       {cr4a1_referencia && (
-        <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--md-sys-color-on-surface-variant)' }}>
+        <p style={{ margin: '0 0 8px', fontSize: '0.8rem', color: 'var(--md-sys-color-on-surface-variant)' }}>
           Ref: {cr4a1_referencia}
         </p>
       )}
 
       {isBinario ? (
-        /* ---------- Switch Binário ---------- */
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-          <span style={{ fontWeight: 500, color: 'var(--md-sys-color-on-surface)', minWidth: 80 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
+          <span style={{ fontWeight: 500, color: 'var(--md-sys-color-on-surface)', minWidth: 80, fontSize: '0.9rem' }}>
             {opcaoAtiva}
           </span>
           <button
@@ -80,25 +73,22 @@ export default function ModeloItem({ item, onChange, initialResposta }) {
           </button>
         </div>
       ) : (
-        /* ---------- Steppers (1 ou 3+ opções) ---------- */
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
           {opcoes.map(op => (
             <div
               key={op}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
+                display: 'flex', alignItems: 'center', gap: 4,
                 backgroundColor: 'var(--md-sys-color-surface-variant)',
-                borderRadius: 28,
-                padding: '4px 16px',
+                borderRadius: 20,
+                padding: '2px 12px',
               }}
             >
-              <span style={{ fontWeight: 500, minWidth: 70, color: 'var(--md-sys-color-on-surface)' }}>
+              <span style={{ fontWeight: 500, fontSize: '0.8rem', color: 'var(--md-sys-color-on-surface)' }}>
                 {op}
               </span>
               <button type="button" onClick={() => decrement(op)} className="stepper-btn">−</button>
-              <span style={{ width: 30, textAlign: 'center', fontWeight: 600, fontSize: '1.1rem' }}>
+              <span style={{ width: 24, textAlign: 'center', fontWeight: 600, fontSize: '0.9rem' }}>
                 {estado[op] || 0}
               </span>
               <button type="button" onClick={() => increment(op)} className="stepper-btn">+</button>

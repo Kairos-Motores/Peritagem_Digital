@@ -85,7 +85,7 @@ export function useDataverse() {
     if (!filial) return [];
     const entitySet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
     const filter = `$filter=cr4a1_filial eq '${encodeURIComponent(filial)}'`;
-    const select = `$select=cr4a1_os,cr4a1_peritador,cr4a1_status`;
+    const select = `$select=cr4a1_os,cr4a1_peritador,cr4a1_status,cr4a1_tem_fotos`;
     const data = await callApi(`/${entitySet}?${filter}&${select}`);
     return data?.value || [];
   };
@@ -225,6 +225,17 @@ export function useDataverse() {
     return data?.value || [];
   };
 
+  const getFotos = async (os) => {
+    const token = user?.token;
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/fotos?os=${encodeURIComponent(os)}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (!res.ok) throw new Error('Erro ao carregar fotos');
+    return res.json();
+  };
+
   return {
     sendInspecao,
     getUsuarios,
@@ -242,5 +253,6 @@ export function useDataverse() {
     getCabecalhos,
     getFilialPeritador,
     getCabecalhosPorFilial,
+    getFotos,
   };
 }

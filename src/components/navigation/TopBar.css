@@ -2,24 +2,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background-color: var(--md-sys-color-surface);
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
   position: sticky;
   top: 0;
   z-index: 100;
-  transition: box-shadow 0.2s;
-  min-height: 56px;
+  transition: box-shadow 0.3s;
+  min-height: 48px;
 }
-
-.topbar.has-logo .topbar-title {
-  display: none; /* oculta o título quando a logo está presente */
-}
-
 .topbar.scrolled {
   box-shadow: var(--md-sys-elevation-1);
 }
-
 .topbar-left,
 .topbar-right {
   display: flex;
@@ -27,21 +21,17 @@
   gap: 8px;
   flex: 0 0 auto;
 }
-
 .topbar-left {
   flex: 0 0 auto;
 }
-
 .topbar-logo {
-  height: 60px;          /* ajuste conforme necessário */
+  height: 40px;
   margin-left: 0;
   object-fit: contain;
 }
-
 .topbar-title {
   flex: 1;
-  margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 600;
   color: var(--md-sys-color-on-surface);
   white-space: nowrap;
@@ -50,14 +40,9 @@
   text-align: left;
   padding: 0 8px;
 }
-
-/* Botões de ícone */
 .topbar-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: none;
   background: transparent;
@@ -66,19 +51,18 @@
   position: relative;
   overflow: hidden;
   transition: background-color 0.2s, color 0.2s, transform 0.1s;
-  font-size: 24px;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-
 .topbar-icon-btn:hover {
   background-color: var(--md-sys-color-primary-container);
   color: var(--md-sys-color-on-primary-container);
 }
-
 .topbar-icon-btn:active {
   transform: scale(0.9);
 }
-
-/* Ripple via pseudo-elemento */
 .topbar-icon-btn::after {
   content: '';
   position: absolute;
@@ -92,51 +76,15 @@
   transform: translate(-50%, -50%);
   transition: width 0.3s, height 0.3s, opacity 0.4s;
 }
-
 .topbar-icon-btn:active::after {
   width: 80px;
   height: 80px;
   opacity: 0.2;
 }
-
-/* Ícone Material Symbols */
 .material-symbols-outlined {
   font-variation-settings:
     'FILL' 1,
     'wght' 400,
     'GRAD' 0,
     'opsz' 24;
-}
-
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background-color: var(--md-sys-color-surface);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  transition: box-shadow 0.3s;
-  min-height: 56px;
-}
-.topbar.scrolled {
-  box-shadow: var(--md-sys-elevation-1);
-}
-.topbar-logo {
-  height: 60px;
-  margin-left: 0;
-  object-fit: contain;
-}
-.topbar-title {
-  flex: 1;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--md-sys-color-on-surface);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: left;
-  padding: 0 8px;
 }
