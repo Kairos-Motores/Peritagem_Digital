@@ -10,6 +10,7 @@ import { useDataverse } from '../hooks/useDataverse';
 import { db } from '../db/fila';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import { useToast } from '../hooks/useToast';
+import { AnimatePresence, motion } from 'framer-motion';
 import Logo from "../assets/Medro llogo horizontal-Medro.svg";
 
 export default function Checklist() {
@@ -27,6 +28,7 @@ export default function Checklist() {
   const [salvando, setSalvando] = useState(false);
 
   const os = inspecaoAtual?.os;
+  const userToken = sessionStorage.getItem('dv_token');
 
   useEffect(() => {
     if (!os) return;
@@ -113,14 +115,24 @@ export default function Checklist() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
       <TopBar title={`OS: ${os}`} logoSrc={Logo} />
-      <div style={{ padding: '12px 16px', display: 'flex', gap: 10, overflowX: 'auto', borderBottom: '1px solid var(--md-sys-color-outline-variant)' }}>
+      
+      {/* Barra de tipos com animação */}
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+        style={{ padding: '12px 16px', display: 'flex', gap: 10, overflowX: 'auto', borderBottom: '1px solid var(--md-sys-color-outline-variant)' }}
+      >
         {tipos.map(tipo => {
           const completo = tipoCompleto(tipo);
           const salvo = tiposSalvos.includes(tipo);
           return (
-            <button
+            <motion.button
               key={tipo}
               onClick={() => setTipoSelecionado(tipo)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 15 }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '6px 14px', borderRadius: 20, border: '1px solid var(--md-sys-color-outline)',
@@ -128,38 +140,80 @@ export default function Checklist() {
                 color: tipo === tipoSelecionado ? '#fff' : salvo ? 'var(--md-sys-color-on-primary-container)' : 'var(--md-sys-color-on-surface)',
                 fontWeight: tipo === tipoSelecionado ? 600 : 400,
                 cursor: 'pointer', whiteSpace: 'nowrap',
-                transition: 'all 0.2s',
                 boxShadow: tipo === tipoSelecionado ? 'var(--md-sys-elevation-1)' : 'none'
               }}
             >
               <span>{tipo}</span>
               {salvo && !completo && <span style={{ color: 'var(--md-sys-color-primary)' }}>✓</span>}
               {completo && <span style={{ color: tipo === tipoSelecionado ? '#fff' : 'var(--md-sys-color-primary)' }}>✔</span>}
-            </button>
+            </motion.button>
           );
         })}
-      </div>
+      </motion.div>
+
+      {/* Itens do tipo selecionado com transição animada */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-        {itensFiltrados.map(item => (
-          <ModeloItem key={item.cr4a1_item} item={item} onChange={(resp) => handleItemChange(item.cr4a1_item, resp)} initialResposta={respostas[item.cr4a1_item]} />
-        ))}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tipoSelecionado}
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -30 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+          >
+            {itensFiltrados.map(item => (
+              <ModeloItem key={item.cr4a1_item} item={item} onChange={(resp) => handleItemChange(item.cr4a1_item, resp)} initialResposta={respostas[item.cr4a1_item]} />
+            ))}
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Botão de salvar tipo */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.3 }}
+          style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}
+        >
           <OutlinedButton onClick={handleSalvarTipo} disabled={salvando}>
             {salvando ? 'Salvando...' : `Salvar "${tipoSelecionado}"`}
           </OutlinedButton>
-        </div>
-        <div style={{ marginTop: 24 }}>
-          <PhotoCapture onCapture={() => {}} />
+        </motion.div>
+
+        {/* Seção de mídia e conclusão */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.3 }}
+          style={{ marginTop: 24 }}
+        >
+          <PhotoCapture
+            onCapture={async (base64, fileName) => {
+              const os = inspecaoAtual?.os;
+              if (!os) return;
+              const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-foto`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${userToken}`,
+                },
+                body: JSON.stringify({ os, fotoBase64: base64, nomeArquivo: fileName }),
+              });
+              if (!res.ok) throw new Error('Upload falhou');
+              const data = await res.json();
+            }}
+          />
           <FilledButton style={{ marginTop: 12 }} onClick={() => setShowSignature(true)}>Assinar Inspeção</FilledButton>
           {showSignature && <SignaturePad onSave={(data) => { setAssinatura(data); setShowSignature(false); }} />}
-          <FilledButton
-            style={{ width: '100%', marginTop: 16 }}
-            onClick={handleConcluir}
-            disabled={!tipos.every(tipo => tipoCompleto(tipo))}
-          >
-            Concluir Inspeção
-          </FilledButton>
-        </div>
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <FilledButton
+              style={{ width: '100%', marginTop: 16 }}
+              onClick={handleConcluir}
+              disabled={!tipos.every(tipo => tipoCompleto(tipo))}
+            >
+              Concluir Inspeção
+            </FilledButton>
+          </motion.div>
+        </motion.div>
       </div>
     </div>
   );

@@ -1,48 +1,52 @@
 :root {
-  // Paleta Profissional e de Confiança
-  --md-sys-color-primary: #0055A4;          // Azul Corporativo
+  // Paleta MD3 (ajustável conforme sua marca)
+  --md-sys-color-primary: #0055A4;
   --md-sys-color-on-primary: #FFFFFF;
   --md-sys-color-primary-container: #D4E4FF;
   --md-sys-color-on-primary-container: #001B3E;
 
-  --md-sys-color-secondary: #333333;        // Cinza Chumbo
+  --md-sys-color-secondary: #333333;
   --md-sys-color-on-secondary: #FFFFFF;
   --md-sys-color-secondary-container: #E0E0E0;
   --md-sys-color-on-secondary-container: #1A1A1A;
 
-  --md-sys-color-tertiary: #333333;
+  --md-sys-color-tertiary: #4A6572;
   --md-sys-color-on-tertiary: #FFFFFF;
-  --md-sys-color-tertiary-container: #E0E0E0;
-  --md-sys-color-on-tertiary-container: #1A1A1A;
+  --md-sys-color-tertiary-container: #C1E8FC;
+  --md-sys-color-on-tertiary-container: #001F2A;
 
   --md-sys-color-error: #BA1A1A;
   --md-sys-color-on-error: #FFFFFF;
   --md-sys-color-error-container: #FFDAD6;
   --md-sys-color-on-error-container: #410002;
 
-  --md-sys-color-background: #FFFFFF;       // Branco Puro
-  --md-sys-color-on-background: #333333;
+  --md-sys-color-background: #FFFFFF;
+  --md-sys-color-on-background: #1A1C1E;
   --md-sys-color-surface: #FFFFFF;
-  --md-sys-color-on-surface: #333333;
+  --md-sys-color-on-surface: #1A1C1E;
   --md-sys-color-surface-variant: #F0F0F0;
   --md-sys-color-on-surface-variant: #444444;
   --md-sys-color-outline: #6F797E;
-  --md-sys-color-outline-variant: #BFC6CC;
+  --md-sys-color-outline-variant: #C0C7CC;
   --md-sys-color-shadow: #000000;
   --md-sys-color-scrim: #000000;
-  --md-sys-color-inverse-surface: #2E3235;
+  --md-sys-color-inverse-surface: #2E3133;
   --md-sys-color-inverse-on-surface: #EFF1F4;
   --md-sys-color-inverse-primary: #A0C8FF;
   --md-sys-color-surface-tint: #0055A4;
 
-  // Bordas arredondadas
+  // Elevações (MD3)
+  --md-sys-elevation-0: 0 0 0 0 transparent;
+  --md-sys-elevation-1: 0 1px 3px 1px rgba(0,0,0,0.15);
+  --md-sys-elevation-2: 0 2px 6px 2px rgba(0,0,0,0.15);
+  --md-sys-elevation-3: 0 4px 8px 3px rgba(0,0,0,0.15);
+  --md-sys-elevation-4: 0 6px 10px 4px rgba(0,0,0,0.15);
+  --md-sys-elevation-5: 0 8px 12px 6px rgba(0,0,0,0.15);
+
+  // Formas
+  --md-sys-shape-corner-extra-small: 4px;
   --md-sys-shape-corner-small: 8px;
   --md-sys-shape-corner-medium: 12px;
   --md-sys-shape-corner-large: 16px;
-
-  // Elevações (sutis)
-  --md-sys-elevation-0: none;
-  --md-sys-elevation-1: 0 1px 3px rgba(0,0,0,0.08);
-  --md-sys-elevation-2: 0 3px 6px rgba(0,0,0,0.10);
-  --md-sys-elevation-3: 0 6px 12px rgba(0,0,0,0.12);
+  --md-sys-shape-corner-extra-large: 28px;
 }
