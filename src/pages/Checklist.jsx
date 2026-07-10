@@ -10,6 +10,7 @@ import { useDataverse } from '../hooks/useDataverse';
 import { db } from '../db/fila';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import { useToast } from '../hooks/useToast';
+import Logo from "../assets/Medro llogo horizontal-Medro.svg";
 
 export default function Checklist() {
   const { inspecaoAtual } = useInspecao();
@@ -111,7 +112,7 @@ export default function Checklist() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
-      <TopBar title={`OS: ${os}`} />
+      <TopBar title={`OS: ${os}`} logoSrc={Logo} />
       <div style={{ padding: '12px 16px', display: 'flex', gap: 10, overflowX: 'auto', borderBottom: '1px solid var(--md-sys-color-outline-variant)' }}>
         {tipos.map(tipo => {
           const completo = tipoCompleto(tipo);

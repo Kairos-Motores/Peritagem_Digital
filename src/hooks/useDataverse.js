@@ -64,7 +64,7 @@ export function useDataverse() {
 
   const getUsuarios = async () => {
     const entitySet = await resolveEntitySet('cr4a1_credenciais');
-    const select = `$select=cr4a1_credenciaisid,cr4a1_usu_x00e1_rio`;
+    const select = `$select=cr4a1_credenciaisid,cr4a1_usu_x00e1_rio,cr4a1_title`;
     return callApi(`/${entitySet}?${select}`);
   };
 
@@ -93,15 +93,21 @@ export function useDataverse() {
   const createCabecalho = async (dados) => {
     const entitySet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
 
-    const payload = { ...dados, cr4a1_status: 'Em andamento' };
-    if (payload.cr4a1_data_peritagem) {
-      const date = new Date(payload.cr4a1_data_peritagem);
-      payload.cr4a1_data_peritagem = date.toISOString();
-    }
+    // Monta o payload com data de início automática e status inicial
+    const payload = {
+      ...dados,
+      cr4a1_data_peritagem: new Date().toISOString(),
+      cr4a1_status: 'Em andamento',
+    };
+    // Remove campo de data final se ainda existir (proteção)
     delete payload.cr4a1_data_peritagem_fim;
 
+    console.log('📤 Enviando cabeçalho:', payload); // LOG TEMPORÁRIO
+
+    // Envio via callApi (já usa o proxy corretamente)
     await callApi(`/${entitySet}`, 'POST', payload);
 
+    // Busca o registro pela OS para obter o ID
     const filter = `$filter=cr4a1_os eq '${encodeURIComponent(dados.cr4a1_os)}'`;
     const search = await callApi(`/${entitySet}?${filter}`);
     const idField = `${entitySet}id`;

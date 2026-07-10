@@ -5,6 +5,7 @@ import { FilledButton } from '../components/ui/MdButton';
 import BottomNav from '../components/navigation/BottomNav';
 import TopBar from '../components/navigation/TopBar';
 import FloatingNav from '../components/navigation/FloatingNav';
+import Logo from "../assets/Medro llogo horizontal-Medro.svg";
 
 export default function NovaInspecao() {
   const [os, setOs] = useState('');
@@ -19,7 +20,7 @@ export default function NovaInspecao() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '16px 16px 100px 16px' }}>
-      <TopBar title="Nova Inspeção" showBack={false} />
+      <TopBar title="Nova Inspeção" showBack={false} logoSrc={Logo} />
       <div style={{ padding: 16, flex: 1 }}>
         <h1>Nova Inspeção</h1>
         <md-filled-text-field

@@ -8,6 +8,7 @@ import ProgressBar from '../components/ui/ProgressBar';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import TopBar from '../components/navigation/TopBar';
 import FloatingNav from '../components/navigation/FloatingNav';
+import Logo from "../assets/Medro llogo horizontal-Medro.svg";
 
 export default function Home() {
   const username = sessionStorage.getItem('dv_username');
@@ -120,7 +121,7 @@ export default function Home() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <TopBar title="Kairós Peritagem" showBack={false} />
+      <TopBar title="Kairós Peritagem" showBack={false} logoSrc={Logo} />
       <div style={{ padding: 16, flex: 1, overflowY: 'auto', paddingBottom: 100 }}>
         <h1 style={{ color: 'var(--md-sys-color-on-background)' }}>
           Bem-vindo, {dadosUsuario?.cr4a1_title || username}

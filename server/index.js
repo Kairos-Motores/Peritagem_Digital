@@ -117,17 +117,25 @@ app.post('/api/dataverse', async (req, res) => {
   const { method, path, body, options } = req.body;
   if (!path) {
     return res.status(400).json({ message: 'Caminho não informado' });
+    console.log('📥 Recebido:', method, path, body);
   }
   try {
     const token = await getAccessToken();
     const dvUrl = `${process.env.DATAVERSE_ENV_URL}/api/data/v9.2${path}`;
 
-    // Se a requisição pede para atualizar data fim, injeta o campo com a hora UTC do servidor
     let requestBody = body;
+    // Injeta data de início se solicitado (criação de cabeçalho)
+    if (options?.atualizarDataInicio && method === 'POST') {
+      requestBody = {
+        ...body,
+        cr4a1_data_peritagem: new Date().toISOString(), // UTC do servidor
+      };
+    }
+    // Injeta data final se solicitado (conclusão)
     if (options?.atualizarDataFim && method === 'PATCH') {
       requestBody = {
         ...body,
-        cr4a1_data_peritagem_fim: new Date().toISOString(),  // UTC do servidor
+        cr4a1_data_peritagem_fim: new Date().toISOString(),
       };
     }
 

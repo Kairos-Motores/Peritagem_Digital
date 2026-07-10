@@ -7,6 +7,7 @@ import { FilledButton } from '../components/ui/MdButton';
 import { ElevatedCard } from '../components/ui/MdCard';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import { useToast } from '../hooks/useToast';
+import Logo from "../assets/Medro llogo horizontal-Medro.svg";
 
 export default function InspecaoDetalhe() {
   const { os } = useParams();
@@ -69,7 +70,7 @@ export default function InspecaoDetalhe() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
-      <TopBar title={`OS: ${os}`} />
+      <TopBar title={`OS: ${os}`} logoSrc={Logo}/>
       <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         {cabecalho && (
           <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>

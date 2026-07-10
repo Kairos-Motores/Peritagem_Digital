@@ -4,6 +4,7 @@ import { useInspecao } from '../contexts/InspecaoContext';
 import { useDataverse } from '../hooks/useDataverse';
 import { FilledButton } from '../components/ui/MdButton';
 import { useToast } from '../hooks/useToast';
+import Logo from "../assets/Medro llogo horizontal-Medro.svg";
 import TopBar from '../components/navigation/TopBar';
 import { ElevatedCard } from '../components/ui/MdCard';
 
@@ -52,7 +53,7 @@ export default function Cabecalho() {
     cr4a1_me: '',
     cr4a1_peritador: nomePeritador,
     cr4a1_mecanico: '',
-    cr4a1_data_peritagem: new Date().toISOString().slice(0, 16),
+    //cr4a1_data_peritagem: new Date().toISOString().slice(0, 16),
     cr4a1_filial: '',
   });
 
@@ -110,7 +111,7 @@ export default function Cabecalho() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
-      <TopBar title="Cabeçalho" />
+      <TopBar title="Cabeçalho" logoSrc={Logo} />
       <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
           <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Identificação do Equipamento</h3>
@@ -163,16 +164,16 @@ export default function Cabecalho() {
               name="cr4a1_mecanico"
               value={form.cr4a1_mecanico}
               onChange={handleChange}
+              style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid var(--md-sys-color-outline)' }}
             >
               <option value="">Selecione...</option>
               {mecanicos.map(u => (
-                <option key={u.cr4a1_credenciaisid} value={u.cr4a1_usu_x00e1_rio}>
+                <option key={u.cr4a1_credenciaisid} value={u.cr4a1_title || u.cr4a1_usu_x00e1_rio}>
                   {u.cr4a1_title || u.cr4a1_usu_x00e1_rio}
                 </option>
               ))}
             </select>
           </div>
-          {renderInput('Data Peritagem', 'cr4a1_data_peritagem', 'datetime-local')}
         </ElevatedCard>
 
         <input type="hidden" name="cr4a1_filial" value={form.cr4a1_filial} />
