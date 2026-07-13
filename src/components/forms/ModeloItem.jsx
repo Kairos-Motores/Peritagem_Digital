@@ -25,7 +25,7 @@ export default function ModeloItem({ item, onChange, initialResposta }) {
   const propagar = (novoEstado, novaObs) => {
     const est = novoEstado || estado;
     const obs = novaObs !== undefined ? novaObs : observacao;
-    onChange({ item_id: cr4a1_item, observacao: obs, quantidades: est });
+    onChange({ item_id: cr4a1_item, descricao: cr4a1_descricao, observacao: obs, quantidades: est });
   };
 
   const toggleBinario = () => {

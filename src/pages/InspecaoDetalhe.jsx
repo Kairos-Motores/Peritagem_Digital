@@ -8,20 +8,23 @@ import { ElevatedCard } from '../components/ui/MdCard';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import { useToast } from '../hooks/useToast';
 import { motion, AnimatePresence } from 'framer-motion';
+import AlbumFotos from '../components/forms/AlbumFotos';
 
 export default function InspecaoDetalhe() {
   const { os } = useParams();
   const navigate = useNavigate();
   const { getCabecalhoByOS, getItensByOS, getFilialPeritador, getFotos } = useDataverse();
   const { retomarInspecao } = useInspecao();
-  const { error: toastError } = useToast();
+  const { error: toastError, success } = useToast();
   const [cabecalho, setCabecalho] = useState(null);
   const [itens, setItens] = useState([]);
   const [fotos, setFotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFoto, setSelectedFoto] = useState(null);
+  const [readonly, setReadonly] = useState(false); // true se concluída
 
   const username = sessionStorage.getItem('dv_username');
+  const userToken = sessionStorage.getItem('dv_token');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -38,6 +41,7 @@ export default function InspecaoDetalhe() {
             navigate('/home');
             return;
           }
+          setReadonly(cab.cr4a1_status === 'Concluída');
         }
         setCabecalho(cab);
         setItens(its);
@@ -51,34 +55,42 @@ export default function InspecaoDetalhe() {
     fetchData();
   }, [os]);
 
-  const handleContinuar = () => {
-    if (!cabecalho) return;
-    const cabecalhoId = cabecalho.cr4a1_peritagem_cabecalhoid;
-    retomarInspecao(os, cabecalhoId);
-    navigate('/checklist');
+  const handleUploadFoto = async (base64, fileName, numero) => {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-foto`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userToken}`,
+      },
+      body: JSON.stringify({ os, fotoBase64: base64, nomeArquivo: fileName }),
+    });
+    if (!res.ok) throw new Error('Upload falhou');
+    const data = await res.json();
+    // Atualiza a lista local removendo qualquer foto antiga com mesmo número e adicionando a nova
+    setFotos(prev => {
+      const outras = prev.filter(f => !f.name.match(new RegExp(`_foto_${numero}\\.jpg$`)));
+      return [...outras, { name: fileName, url: data.url, id: data.id }];
+    });
+    success('Foto salva com sucesso!');
   };
 
-  const openFoto = (foto) => setSelectedFoto(foto);
+  const handleViewFoto = (foto) => {
+    setSelectedFoto(foto);
+  };
+
   const closeFoto = () => setSelectedFoto(null);
-  const prevFoto = () => {
-    const idx = fotos.findIndex(f => f.id === selectedFoto.id);
-    if (idx > 0) setSelectedFoto(fotos[idx - 1]);
-  };
-  const nextFoto = () => {
-    const idx = fotos.findIndex(f => f.id === selectedFoto.id);
-    if (idx < fotos.length - 1) setSelectedFoto(fotos[idx + 1]);
-  };
 
   if (loading) return <LoadingScreen message="Carregando detalhes" />;
 
-  const renderField = (label, value) => (
+  const renderField = (label, value) =>
     value ? (
       <div style={{ marginBottom: 8, display: 'flex', flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 600, color: 'var(--md-sys-color-primary)', marginRight: 8, minWidth: 130 }}>{label}:</span>
+        <span style={{ fontWeight: 600, color: 'var(--md-sys-color-primary)', marginRight: 8, minWidth: 130 }}>
+          {label}:
+        </span>
         <span style={{ color: 'var(--md-sys-color-on-surface)' }}>{value}</span>
       </div>
-    ) : null
-  );
+    ) : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
@@ -86,7 +98,30 @@ export default function InspecaoDetalhe() {
       <div className="page-content" style={{ paddingBottom: 24 }}>
         {cabecalho && (
           <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
-            {/* ... Cabeçalho (status, campos, botão continuar) ... */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h2 style={{ margin: 0, color: 'var(--md-sys-color-on-surface)' }}>Dados da Peritagem</h2>
+              {cabecalho.cr4a1_status && (
+                <span
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: 16,
+                    backgroundColor:
+                      cabecalho.cr4a1_status === 'Concluída'
+                        ? 'var(--md-sys-color-primary)'
+                        : 'var(--md-sys-color-surface-variant)',
+                    color:
+                      cabecalho.cr4a1_status === 'Concluída'
+                        ? '#fff'
+                        : 'var(--md-sys-color-on-surface-variant)',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  {cabecalho.cr4a1_status}
+                </span>
+              )}
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 8, marginBottom: 20 }}>
               {renderField('Cliente', cabecalho.cr4a1_cliente)}
               {renderField('Área', cabecalho.cr4a1_area)}
@@ -118,47 +153,51 @@ export default function InspecaoDetalhe() {
               {renderField('ME', cabecalho.cr4a1_me)}
               {renderField('Peritador', cabecalho.cr4a1_peritador)}
               {renderField('Mecânico', cabecalho.cr4a1_mecanico)}
-              {renderField('Data Início', cabecalho.cr4a1_data_peritagem ? new Date(cabecalho.cr4a1_data_peritagem).toLocaleString() : null)}
-              {renderField('Data Fim', cabecalho.cr4a1_data_peritagem_fim ? new Date(cabecalho.cr4a1_data_peritagem_fim).toLocaleString() : null)}
+              {renderField(
+                'Data Início',
+                cabecalho.cr4a1_data_peritagem
+                  ? new Date(cabecalho.cr4a1_data_peritagem).toLocaleString()
+                  : null
+              )}
+              {renderField(
+                'Data Fim',
+                cabecalho.cr4a1_data_peritagem_fim
+                  ? new Date(cabecalho.cr4a1_data_peritagem_fim).toLocaleString()
+                  : null
+              )}
             </div>
+
             {cabecalho.cr4a1_status === 'Em andamento' && (
-              <FilledButton onClick={handleContinuar} style={{ width: '100%', marginTop: 8 }}>
+              <FilledButton
+                onClick={() => {
+                  const cabecalhoId = cabecalho.cr4a1_peritagem_cabecalhoid;
+                  retomarInspecao(os, cabecalhoId);
+                  navigate('/checklist');
+                }}
+                style={{ width: '100%', marginTop: 8 }}
+              >
                 Continuar Inspeção
               </FilledButton>
             )}
           </ElevatedCard>
         )}
 
-        {/* Galeria de Fotos */}
-        {fotos.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <h2 style={{ color: 'var(--md-sys-color-on-surface)', marginBottom: 12 }}>Fotos da Inspeção</h2>
-            <motion.div layout style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
-              {fotos.map(foto => (
-                <motion.div
-                  key={foto.id}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => openFoto(foto)}
-                  style={{
-                    borderRadius: 12,
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    boxShadow: 'var(--md-sys-elevation-1)',
-                    aspectRatio: '1 / 1',
-                    backgroundColor: 'var(--md-sys-color-surface-variant)',
-                  }}
-                >
-                  <img src={foto.url} alt={foto.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-        )}
+        {/* Álbum de fotos */}
+        <AlbumFotos
+          os={os}
+          fotos={fotos}
+          onUpload={handleUploadFoto}
+          onViewFoto={handleViewFoto}
+          readonly={readonly}
+        />
 
         {/* Itens da Inspeção */}
-        <h2 style={{ color: 'var(--md-sys-color-on-surface)', marginBottom: 12 }}>Itens Avaliados</h2>
-        {itens.length === 0 && <p style={{ color: 'var(--md-sys-color-on-surface-variant)' }}>Nenhum item registrado.</p>}
+        <h2 style={{ color: 'var(--md-sys-color-on-surface)', marginTop: 24, marginBottom: 12 }}>
+          Itens Avaliados
+        </h2>
+        {itens.length === 0 && (
+          <p style={{ color: 'var(--md-sys-color-on-surface-variant)' }}>Nenhum item registrado.</p>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
           {itens.map(item => {
             const quantStr = item.cr4a1_var_quant || '';
@@ -169,7 +208,7 @@ export default function InspecaoDetalhe() {
             return (
               <ElevatedCard key={item.cr4a1_peritagem_b04id} style={{ padding: 16 }}>
                 <div style={{ fontWeight: 600, color: 'var(--md-sys-color-primary)', marginBottom: 8 }}>
-                  {item.cr4a1_item || 'Item sem nome'}
+                  {item.cr4a1_descricao || item.cr4a1_item || 'Item sem nome'}
                 </div>
                 {item.cr4a1_observacao && (
                   <p style={{ marginBottom: 8, fontSize: '0.9rem', color: 'var(--md-sys-color-on-surface)' }}>
@@ -179,14 +218,17 @@ export default function InspecaoDetalhe() {
                 {quantPairs.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {quantPairs.map((p, idx) => (
-                      <span key={idx} style={{
-                        backgroundColor: 'var(--md-sys-color-surface-variant)',
-                        color: 'var(--md-sys-color-on-surface-variant)',
-                        padding: '2px 10px',
-                        borderRadius: 16,
-                        fontSize: '0.8rem',
-                        fontWeight: 500,
-                      }}>
+                      <span
+                        key={idx}
+                        style={{
+                          backgroundColor: 'var(--md-sys-color-surface-variant)',
+                          color: 'var(--md-sys-color-on-surface-variant)',
+                          padding: '2px 10px',
+                          borderRadius: 16,
+                          fontSize: '0.8rem',
+                          fontWeight: 500,
+                        }}
+                      >
                         {p.opcao}: {p.quantidade}
                       </span>
                     ))}
@@ -207,7 +249,13 @@ export default function InspecaoDetalhe() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            style={{ background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}
+            style={{
+              background: 'rgba(0,0,0,0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000,
+            }}
           >
             <motion.div
               onClick={(e) => e.stopPropagation()}
@@ -216,10 +264,27 @@ export default function InspecaoDetalhe() {
               exit={{ scale: 0.8 }}
               style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}
             >
-              <button onClick={closeFoto} style={{ position: 'absolute', top: 0, right: 0, background: 'none', border: 'none', color: '#fff', fontSize: '2rem', cursor: 'pointer', padding: 8 }}>✕</button>
-              <img src={selectedFoto.url} alt={selectedFoto.name} style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8 }} />
-              <button onClick={prevFoto} style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#fff', fontSize: '3rem', cursor: 'pointer', padding: '0 12px', opacity: fotos.indexOf(selectedFoto) === 0 ? 0.3 : 0.8 }} disabled={fotos.indexOf(selectedFoto) === 0}>‹</button>
-              <button onClick={nextFoto} style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#fff', fontSize: '3rem', cursor: 'pointer', padding: '0 12px', opacity: fotos.indexOf(selectedFoto) === fotos.length - 1 ? 0.3 : 0.8 }} disabled={fotos.indexOf(selectedFoto) === fotos.length - 1}>›</button>
+              <button
+                onClick={closeFoto}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  background: 'none',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '2rem',
+                  cursor: 'pointer',
+                  padding: 8,
+                }}
+              >
+                ✕
+              </button>
+              <img
+                src={selectedFoto.url}
+                alt={selectedFoto.name}
+                style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8 }}
+              />
             </motion.div>
           </motion.div>
         )}

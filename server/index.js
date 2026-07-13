@@ -195,6 +195,7 @@ app.post('/api/dataverse', async (req, res) => {
   }
 });
 
+// Endpoint de upload de foto
 // Endpoint de upload de foto (busca dinâmica do drive "Doc Técnicos")
 app.post('/api/upload-foto', async (req, res) => {
   const { os, fotoBase64, nomeArquivo } = req.body;
@@ -322,7 +323,7 @@ app.get('/api/fotos', async (req, res) => {
   const { os } = req.query;
   if (!os) return res.status(400).json({ message: 'OS é obrigatória' });
 
-  // Verifica token de sessão (JWT) para segurança
+  // Verifica token de sessão (JWT)
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'Token não fornecido' });
@@ -352,27 +353,34 @@ app.get('/api/fotos', async (req, res) => {
     // 2. Token do Graph
     const graphToken = await getGraphToken();
 
-    // 3. Localizar o drive "Doc Técnicos"
+    // 3. Obter drives do site e localizar "Doc Técnicos"
     const drivesUrl = `https://graph.microsoft.com/v1.0/sites/${SHAREPOINT_SITE_ID}/drives`;
     const drivesRes = await fetch(drivesUrl, {
       headers: { Authorization: `Bearer ${graphToken}` },
     });
+    if (!drivesRes.ok) {
+      const err = await drivesRes.text();
+      throw new Error(`Falha ao listar drives: ${err}`);
+    }
     const drivesData = await drivesRes.json();
     const drive = drivesData.value.find(
       d => d.name === 'Doc Técnicos' || d.webUrl.includes('Doc%20Tcnicos')
     );
-    if (!drive) return res.status(404).json({ message: 'Biblioteca não encontrada' });
+    if (!drive) {
+      return res.status(404).json({ message: 'Biblioteca "Doc Técnicos" não encontrada no site' });
+    }
+    const driveId = drive.id;
 
-    // 4. Montar caminho da pasta
+    // 4. Montar o caminho da pasta de fotos dessa OS
     const folderPath = `Fotos Peritagens/${filial}/${cliente}/${os}/Peritagem`;
     const encodedPath = folderPath.split('/').map(encodeURIComponent).join('/');
-    const listUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encodedPath}:/children`;
+    const listUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${encodedPath}:/children`;
 
     const listRes = await fetch(listUrl, {
       headers: { Authorization: `Bearer ${graphToken}` },
     });
     if (!listRes.ok) {
-      // Pasta pode não existir (sem fotos), retorna array vazio
+      // Se a pasta não existir (sem fotos), retorna array vazio
       if (listRes.status === 404) return res.json([]);
       throw new Error(`Erro ao listar fotos: ${await listRes.text()}`);
     }
@@ -384,6 +392,7 @@ app.get('/api/fotos', async (req, res) => {
         id: item.id,
         name: item.name,
         url: item.webUrl,
+        // miniatura, se disponível
         thumbnailUrl: item.thumbnails?.[0]?.medium?.url || item.webUrl,
       }));
 

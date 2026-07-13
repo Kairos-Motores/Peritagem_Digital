@@ -4,8 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton } from '../components/ui/MdButton';
 import TopBar from '../components/navigation/TopBar';
 import ModeloItem from '../components/forms/ModeloItem';
-import PhotoCapture from '../components/forms/PhotoCapture';
-import SignaturePad from '../components/forms/SignaturePad';
 import { useDataverse } from '../hooks/useDataverse';
 import { db } from '../db/fila';
 import LoadingScreen from '../components/ui/LoadingScreen';
@@ -21,8 +19,6 @@ export default function Checklist() {
 
   const [itensModelo, setItensModelo] = useState([]);
   const [respostas, setRespostas] = useState({});
-  const [showSignature, setShowSignature] = useState(false);
-  const [assinatura, setAssinatura] = useState(null);
   const [tipoSelecionado, setTipoSelecionado] = useState(null);
   const [tiposSalvos, setTiposSalvos] = useState([]);
   const [salvando, setSalvando] = useState(false);
@@ -32,7 +28,10 @@ export default function Checklist() {
 
   useEffect(() => {
     if (!os) return;
-    Promise.all([getModeloItens(), getItensByOS(os)]).then(([modelo, itensSalvos]) => {
+    Promise.all([
+      getModeloItens(),
+      getItensByOS(os)
+    ]).then(([modelo, itensSalvos]) => {
       setItensModelo(modelo);
       const respostasIniciais = {};
       const tiposPersistidos = new Set();
@@ -45,6 +44,7 @@ export default function Checklist() {
         });
         respostasIniciais[item.cr4a1_item] = {
           item_id: item.cr4a1_item,
+          descricao: item.cr4a1_descricao || '',
           observacao: item.cr4a1_observacao || '',
           quantidades: quantObj,
         };
@@ -100,8 +100,18 @@ export default function Checklist() {
     }
     try {
       if (inspecaoAtual.cabecalhoId) await updateStatusCabecalho(inspecaoAtual.cabecalhoId, 'Concluída');
-      const inspecaoCompleta = { ...inspecaoAtual, respostas: Object.values(respostas), assinatura, fotos: inspecaoAtual?.fotos || [], dataConclusao: new Date().toISOString() };
-      await db.fila.add({ motor_id: os, dados: JSON.stringify(inspecaoCompleta), status: 'pendente', created_at: new Date().toISOString() });
+      const inspecaoCompleta = {
+        ...inspecaoAtual,
+        respostas: Object.values(respostas),
+        fotos: inspecaoAtual?.fotos || [],
+        dataConclusao: new Date().toISOString(),
+      };
+      await db.fila.add({
+        motor_id: os,
+        dados: JSON.stringify(inspecaoCompleta),
+        status: 'pendente',
+        created_at: new Date().toISOString(),
+      });
       success('Inspeção concluída!');
       setTimeout(() => navigate('/home'), 600);
     } catch (err) {
@@ -193,22 +203,6 @@ export default function Checklist() {
           transition={{ delay: 0.3, duration: 0.3 }}
           style={{ marginTop: 24 }}
         >
-          <PhotoCapture
-            onCapture={async (base64, fileName) => {
-              const os = inspecaoAtual?.os;
-              if (!os) return;
-              const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-foto`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${userToken}`,
-                },
-                body: JSON.stringify({ os, fotoBase64: base64, nomeArquivo: fileName }),
-              });
-              if (!res.ok) throw new Error('Upload falhou');
-              const data = await res.json();
-            }}
-          />
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <FilledButton
               style={{ width: '100%', marginTop: 16 }}

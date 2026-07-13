@@ -167,7 +167,7 @@ export function useDataverse() {
     return osList;
   };
 
-  const upsertItemResposta = async (os, itemId, quantString, observacao) => {
+  const upsertItemResposta = async (os, itemId, quantString, observacao, descricao) => {
     const entitySet = await resolveEntitySet('cr4a1_peritagem_b04');
     const filter = `$filter=cr4a1_os eq '${encodeURIComponent(os)}' and cr4a1_item eq '${encodeURIComponent(itemId)}'`;
     const existente = await callApi(`/${entitySet}?${filter}`);
@@ -178,6 +178,7 @@ export function useDataverse() {
       cr4a1_item: itemId,
       cr4a1_observacao: observacao || '',
       cr4a1_var_quant: quantString,
+      cr4a1_descricao: descricao || '',
     };
 
     if (registro) {
@@ -193,7 +194,7 @@ export function useDataverse() {
       const quantString = Object.entries(resposta.quantidades)
         .map(([op, qty]) => `${op}:${qty}`)
         .join(';');
-      await upsertItemResposta(os, resposta.item_id, quantString, resposta.observacao);
+      await upsertItemResposta(os, resposta.item_id, quantString, resposta.observacao, resposta.descricao);
     }
   };
 
