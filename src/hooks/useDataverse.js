@@ -237,6 +237,15 @@ export function useDataverse() {
     return res.json();
   };
 
+  const validarOS = async (os) => {
+    const token = user?.token;
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/validar-os?os=${encodeURIComponent(os)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Erro ao validar OS');
+    return res.json();
+  };
+
   return {
     sendInspecao,
     getUsuarios,
@@ -255,5 +264,6 @@ export function useDataverse() {
     getFilialPeritador,
     getCabecalhosPorFilial,
     getFotos,
+    validarOS,
   };
 }

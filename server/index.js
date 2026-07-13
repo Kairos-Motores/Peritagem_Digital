@@ -403,6 +403,47 @@ app.get('/api/fotos', async (req, res) => {
   }
 });
 
+// Endpoint para validar OS
+app.get('/api/validar-os', async (req, res) => {
+  const { os } = req.query;
+  if (!os) return res.status(400).json({ message: 'OS é obrigatória' });
+
+  try {
+    const token = await getAccessToken();
+
+    // Consulta em cr4a1_zb6_relatorio (cr4a1_novacoluna)
+    const zb6Set = await resolveEntitySet('cr4a1_zb6_relatorio');
+    const zb6Url = `${process.env.DATAVERSE_ENV_URL}/api/data/v9.2/${zb6Set}?$filter=cr4a1_novacoluna eq '${encodeURIComponent(os)}'&$top=1`;
+    const zb6Res = await fetch(zb6Url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+    const zb6Data = await zb6Res.json();
+    const existeNaZb6 = zb6Data.value?.length > 0;
+
+    // Consulta em cr4a1_base_medro (cr4a1_os_comp)
+    const medroSet = await resolveEntitySet('cr4a1_base_medro');
+    const medroUrl = `${process.env.DATAVERSE_ENV_URL}/api/data/v9.2/${medroSet}?$filter=cr4a1_os_comp eq '${encodeURIComponent(os)}'&$select=cr4a1_cliente,cr4a1_os_comp&$top=1`;
+    const medroRes = await fetch(medroUrl, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+    const medroData = await medroRes.json();
+    const existeNaMedro = medroData.value?.length > 0;
+    const cliente = existeNaMedro ? medroData.value[0].cr4a1_cliente || '' : '';
+
+    res.json({
+      existeNaZb6,
+      existeNaMedro,
+      cliente,
+      status: !existeNaZb6 && !existeNaMedro
+        ? 'nao_encontrada'
+        : (existeNaZb6 && !existeNaMedro ? 'apenas_zb6' : 'valida'),
+    });
+  } catch (error) {
+    console.error('Erro ao validar OS:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`✅ Servidor API rodando em http://localhost:${PORT}`);
 });

@@ -11,6 +11,7 @@ import { ElevatedCard } from '../components/ui/MdCard';
 export default function Cabecalho() {
   const [searchParams] = useSearchParams();
   const os = searchParams.get('os') || '';
+  const clienteInicial = searchParams.get('cliente') || ''; // ← NOVO
   const { inspecaoAtual, setCabecalhoId } = useInspecao();
   const navigate = useNavigate();
   const { createCabecalho, getUsuarios, getUsuarioLogado, getFilialPeritador } = useDataverse();
@@ -23,7 +24,7 @@ export default function Cabecalho() {
 
   const [form, setForm] = useState({
     cr4a1_os: os,
-    cr4a1_cliente: '',
+    cr4a1_cliente: clienteInicial, // ← preenchido automaticamente
     cr4a1_area: '',
     cr4a1_n_serie: '',
     cr4a1_os_retorno: '',
@@ -53,7 +54,6 @@ export default function Cabecalho() {
     cr4a1_me: '',
     cr4a1_peritador: nomePeritador,
     cr4a1_mecanico: '',
-    //cr4a1_data_peritagem: new Date().toISOString().slice(0, 16),
     cr4a1_filial: '',
   });
 
