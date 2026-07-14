@@ -207,155 +207,84 @@ app.post('/api/dataverse', async (req, res) => {
   }
 });
 
-app.post('/api/upload-foto-temp', async (req, res) => {
-  const { os, itemId, fotoBase64 } = req.body;
-  if (!os || !fotoBase64) {
-    return res.status(400).json({ message: 'OS e foto são obrigatórios' });
+// Upload de foto (checklist) – salva diretamente na pasta definitiva com nome temporário
+app.post('/api/upload-foto', async (req, res) => {
+  console.log('>>> Rota /api/upload-foto foi chamada!');
+  const { os, fotoBase64, nomeArquivo, filial: filialEnviada, cliente: clienteEnviado } = req.body;
+  if (!os || !fotoBase64 || !nomeArquivo) {
+    return res.status(400).json({ message: 'OS, foto e nomeArquivo são obrigatórios' });
   }
-  try {
-    const graphToken = await getGraphToken();
-    const drive = await getDocTecnicosDrive(graphToken);
-    const tempFolder = `Fotos Peritagens/Temp/${os}`;
-    await ensureFolderPath(graphToken, drive.id, tempFolder);
-    const fileName = `${itemId || 'semitem'}_${uuidv4()}.jpg`;
-    const base64Data = fotoBase64.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
-    const uploadUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encodeURIComponent(tempFolder)}/${fileName}:/content`;
-    const uploadRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${graphToken}`,
-        'Content-Type': 'application/octet-stream',
-      },
-      body: buffer,
-    });
-    if (!uploadRes.ok) throw new Error(`Falha no upload temporário: ${await uploadRes.text()}`);
-    const uploaded = await uploadRes.json();
-    res.json({ url: uploaded.webUrl, id: uploaded.id, name: fileName });
-  } catch (error) {
-    console.error('Erro no upload temp:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
 
-app.get('/api/fotos-temp', async (req, res) => {
-  const { os } = req.query;
-  if (!os) return res.status(400).json({ message: 'OS é obrigatória' });
   try {
-    const graphToken = await getGraphToken();
-    const drive = await getDocTecnicosDrive(graphToken);
-    const tempFolder = `Fotos Peritagens/Temp/${os}`;
-    const encodedFolder = tempFolder.split('/').map(encodeURIComponent).join('/');
-    const listUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encodedFolder}:/children`;
-    const listRes = await fetch(listUrl, { headers: { Authorization: `Bearer ${graphToken}` } });
-    if (!listRes.ok) {
-      if (listRes.status === 404) return res.json([]);
-      throw new Error(`Erro ao listar fotos temporárias: ${await listRes.text()}`);
+    let filial = filialEnviada;
+    let cliente = clienteEnviado;
+    let cabecalhoId = null;
+
+    // Se o frontend enviou filial/cliente, usa-os; caso contrário, pesquisa no Dataverse
+    if (!filial || !cliente) {
+      const cabSet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
+      const tokenDV = await getAccessToken();
+      const queryUrl = `${process.env.DATAVERSE_ENV_URL}/api/data/v9.2/${cabSet}?$filter=cr4a1_os eq '${encodeURIComponent(os)}'&$select=cr4a1_filial,cr4a1_cliente,${cabSet}id`;
+      console.log('🔎 Procurando cabeçalho:', queryUrl);
+      const cabRes = await fetch(queryUrl, {
+        headers: { Authorization: `Bearer ${tokenDV}`, Accept: 'application/json' }
+      });
+      const cabData = await cabRes.json();
+      console.log('📦 Resposta do Dataverse:', JSON.stringify(cabData).slice(0, 300));
+      const cab = cabData.value?.[0];
+      if (!cab) {
+        return res.status(404).json({ message: `Cabeçalho não encontrado para a OS "${os}". Verifique se a OS está correta e se o cabeçalho foi salvo.` });
+      }
+      filial = cab.cr4a1_filial || 'SemFilial';
+      cliente = cab.cr4a1_cliente || 'SemCliente';
+      cabecalhoId = cab[`${cabSet}id`];
+      console.log(`✔ Cabeçalho encontrado: filial=${filial}, cliente=${cliente}, id=${cabecalhoId}`);
     }
-    const listData = await listRes.json();
-    const fotos = listData.value
-      .filter(item => item.file?.mimeType?.startsWith('image/'))
-      .map(item => ({ id: item.id, name: item.name, url: item.webUrl }));
-    res.json(fotos);
-  } catch (error) {
-    console.error('Erro ao listar fotos temp:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
 
-// Mover fotos selecionadas para o álbum definitivo
-app.post('/api/mover-fotos-album', async (req, res) => {
-  const { os, filial, cliente, selecoes } = req.body;
-  if (!os || !Array.isArray(selecoes)) {
-    return res.status(400).json({ message: 'OS e seleções são obrigatórios' });
-  }
-
-  try {
     const graphToken = await getGraphToken();
     const drive = await getDocTecnicosDrive(graphToken);
-    const albumFolder = `Fotos Peritagens/${filial || 'SemFilial'}/${cliente || 'SemCliente'}/${os}/Peritagem`;
+    const albumFolder = `Fotos Peritagens/${filial}/${cliente}/${os}/Peritagem`;
     await ensureFolderPath(graphToken, drive.id, albumFolder);
 
-    const resultados = [];
+    const base64Data = fotoBase64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const uploadUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encodeURIComponent(albumFolder)}/${encodeURIComponent(nomeArquivo)}:/content`;
 
-    for (const sel of selecoes) {
-      const { fotoId, quadradoNumero, itemId } = sel;
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${graphToken}`, 'Content-Type': 'application/octet-stream' },
+      body: buffer,
+    });
 
-      let descricao = 'foto';
-      if (itemId) {
-        try {
-          const itemSet = await resolveEntitySet('cr4a1_peritagem_b01');
-          const tokenDV = await getAccessToken();
-          const itemRes = await fetch(
-            `${process.env.DATAVERSE_ENV_URL}/api/data/v9.2/${itemSet}?$filter=cr4a1_item eq '${itemId}'&$select=cr4a1_descricao`,
-            { headers: { Authorization: `Bearer ${tokenDV}`, Accept: 'application/json' } }
-          );
-          const itemData = await itemRes.json();
-          if (itemData.value?.length > 0) {
-            descricao = itemData.value[0].cr4a1_descricao || 'foto';
-          }
-        } catch { }
-      }
-
-      // Sanitiza a descrição para nome de arquivo
-      const descricaoSanitizada = descricao
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/\s+/g, '_')
-        .replace(/[^a-zA-Z0-9_\-]/g, '')
-        .substring(0, 40);
-      const novoNome = `${os}_${descricaoSanitizada}_${quadradoNumero}.jpg`;
-
-      // Copiar o arquivo para a pasta de destino
-      const copyUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/items/${fotoId}/copy`;
-      const copyBody = {
-        parentReference: {
-          driveId: drive.id,
-          path: `/drive/root:/${albumFolder}`,
-        },
-        name: novoNome,
-      };
-
-      console.log(`📋 Copiando foto ${fotoId} → ${novoNome}`);
-      const copyRes = await fetch(copyUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${graphToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(copyBody),
-      });
-
-      if (!copyRes.ok) {
-        const errText = await copyRes.text();
-        console.error(`Erro ao copiar foto ${fotoId}:`, errText);
-        resultados.push({ quadradoNumero, status: 'erro', message: errText });
-        continue;
-      }
-
-      // Deletar o arquivo original (temporário)
-      const deleteUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/items/${fotoId}`;
-      const deleteRes = await fetch(deleteUrl, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${graphToken}`,
-        },
-      });
-
-      if (!deleteRes.ok) {
-        console.warn(`Não foi possível deletar a foto original ${fotoId}, mas a cópia foi feita.`);
-      }
-
-      resultados.push({ quadradoNumero, status: 'ok', url: `${albumFolder}/${novoNome}` });
+    if (!uploadRes.ok) {
+      const errText = await uploadRes.text();
+      throw new Error(`Falha no upload: ${errText}`);
     }
 
-    res.json({ resultados });
+    const uploaded = await uploadRes.json();
+
+    if (cabecalhoId) {
+      try {
+        const cabSet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
+        await fetch(`${process.env.DATAVERSE_ENV_URL}/api/data/v9.2/${cabSet}(${cabecalhoId})`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${await getAccessToken()}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cr4a1_tem_fotos: 1 }),
+        });
+        console.log(`✔ Cabeçalho ${cabecalhoId} marcado com fotos.`);
+      } catch (err) {
+        console.error('Erro ao atualizar tem_fotos:', err);
+      }
+    }
+
+    res.json({ url: uploaded.webUrl, id: uploaded.id, name: nomeArquivo });
   } catch (error) {
-    console.error('Erro ao mover fotos:', error);
+    console.error('Erro no upload:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
+// Lista fotos de uma OS
 app.get('/api/fotos', async (req, res) => {
   const { os } = req.query;
   if (!os) return res.status(400).json({ message: 'OS é obrigatória' });
@@ -404,6 +333,87 @@ app.get('/api/fotos', async (req, res) => {
   }
 });
 
+// Renomear fotos selecionadas para o álbum
+app.post('/api/renomear-fotos-album', async (req, res) => {
+  const { os, filial, cliente, selecoes } = req.body;
+  if (!os || !Array.isArray(selecoes)) {
+    return res.status(400).json({ message: 'OS e seleções são obrigatórios' });
+  }
+
+  try {
+    const graphToken = await getGraphToken();
+    const drive = await getDocTecnicosDrive(graphToken);
+    const albumFolder = `Fotos Peritagens/${filial || 'SemFilial'}/${cliente || 'SemCliente'}/${os}/Peritagem`;
+
+    const resultados = [];
+
+    for (const sel of selecoes) {
+      const { fotoId, quadradoNumero, itemId } = sel;
+
+      // Buscar nome original da foto
+      const itemUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/items/${fotoId}`;
+      const itemRes = await fetch(itemUrl, { headers: { Authorization: `Bearer ${graphToken}` } });
+      if (!itemRes.ok) {
+        resultados.push({ quadradoNumero, status: 'erro', message: `Foto ${fotoId} não encontrada` });
+        continue;
+      }
+      const itemData = await itemRes.json();
+      const nomeOriginal = itemData.name;
+
+      // Verificar se o nome contém '_temp_' (formato esperado: itemId_temp_guid.jpg)
+      if (!nomeOriginal.includes('_temp_')) {
+        resultados.push({ quadradoNumero, status: 'erro', message: 'Foto já está no formato final' });
+        continue;
+      }
+
+      let descricao = 'foto';
+      if (itemId) {
+        try {
+          const itemSet = await resolveEntitySet('cr4a1_peritagem_b01');
+          const tokenDV = await getAccessToken();
+          const itemQuery = `${process.env.DATAVERSE_ENV_URL}/api/data/v9.2/${itemSet}?$filter=cr4a1_item eq '${itemId}'&$select=cr4a1_descricao`;
+          const itemDescRes = await fetch(itemQuery, { headers: { Authorization: `Bearer ${tokenDV}`, Accept: 'application/json' } });
+          const itemDescData = await itemDescRes.json();
+          if (itemDescData.value?.length > 0) descricao = itemDescData.value[0].cr4a1_descricao || 'foto';
+        } catch { }
+      }
+
+      const descSanitizada = descricao
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_\-]/g, '')
+        .substring(0, 40);
+
+      const novoNome = `${os}_${descSanitizada}_${quadradoNumero}.jpg`;
+
+      const renameUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/items/${fotoId}`;
+      const patchBody = { name: novoNome };
+      const renameRes = await fetch(renameUrl, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${graphToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(patchBody),
+      });
+
+      if (!renameRes.ok) {
+        const errText = await renameRes.text();
+        resultados.push({ quadradoNumero, status: 'erro', message: errText });
+      } else {
+        const updated = await renameRes.json();
+        resultados.push({ quadradoNumero, status: 'ok', url: updated.webUrl });
+      }
+    }
+
+    res.json({ resultados });
+  } catch (error) {
+    console.error('Erro ao renomear fotos:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 app.get('/api/validar-os', async (req, res) => {
   const { os } = req.query;
   if (!os) return res.status(400).json({ message: 'OS é obrigatória' });
@@ -430,96 +440,6 @@ app.get('/api/validar-os', async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao validar OS:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Renomear fotos selecionadas para o álbum
-app.post('/api/renomear-fotos-album', async (req, res) => {
-  const { os, selecoes } = req.body;
-  // selecoes: [{ fotoId, quadradoNumero, itemId }]
-  if (!os || !Array.isArray(selecoes)) {
-    return res.status(400).json({ message: 'OS e seleções são obrigatórios' });
-  }
-
-  try {
-    const graphToken = await getGraphToken();
-    const drive = await getDocTecnicosDrive(graphToken);
-    // Pasta definitiva (já conhecida, podemos obtê-la do cabeçalho ou do contexto; como o frontend enviará filial/cliente, podemos usá-los)
-    const { filial, cliente } = req.body;
-    const albumFolder = `Fotos Peritagens/${filial || 'SemFilial'}/${cliente || 'SemCliente'}/${os}/Peritagem`;
-
-    const resultados = [];
-
-    for (const sel of selecoes) {
-      const { fotoId, quadradoNumero, itemId } = sel;
-
-      // Buscar nome original da foto
-      const itemUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/items/${fotoId}`;
-      const itemRes = await fetch(itemUrl, { headers: { Authorization: `Bearer ${graphToken}` } });
-      if (!itemRes.ok) {
-        resultados.push({ quadradoNumero, status: 'erro', message: `Foto ${fotoId} não encontrada` });
-        continue;
-      }
-      const itemData = await itemRes.json();
-      const nomeOriginal = itemData.name;
-
-      // Verificar se o nome contém '_temp_' (formato esperado: itemId_temp_guid.jpg)
-      if (!nomeOriginal.includes('_temp_')) {
-        resultados.push({ quadradoNumero, status: 'erro', message: 'Foto já está no formato final' });
-        continue;
-      }
-
-      // Obter descrição do item (se possível)
-      let descricao = 'foto';
-      if (itemId) {
-        try {
-          const itemSet = await resolveEntitySet('cr4a1_peritagem_b01');
-          const tokenDV = await getAccessToken();
-          const itemQuery = `${process.env.DATAVERSE_ENV_URL}/api/data/v9.2/${itemSet}?$filter=cr4a1_item eq '${itemId}'&$select=cr4a1_descricao`;
-          const itemDescRes = await fetch(itemQuery, { headers: { Authorization: `Bearer ${tokenDV}`, Accept: 'application/json' } });
-          const itemDescData = await itemDescRes.json();
-          if (itemDescData.value?.length > 0) descricao = itemDescData.value[0].cr4a1_descricao || 'foto';
-        } catch { }
-      }
-
-      // Sanitizar descrição
-      const descSanitizada = descricao
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/\s+/g, '_')
-        .replace(/[^a-zA-Z0-9_\-]/g, '')
-        .substring(0, 40);
-
-      const novoNome = `${os}_${descSanitizada}_${quadradoNumero}.jpg`;
-
-      // Renomear via PATCH
-      const renameUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/items/${fotoId}`;
-      const patchBody = { name: novoNome };
-      const renameRes = await fetch(renameUrl, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${graphToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(patchBody),
-      });
-
-      if (!renameRes.ok) {
-        const errText = await renameRes.text();
-        resultados.push({ quadradoNumero, status: 'erro', message: errText });
-      } else {
-        const updated = await renameRes.json();
-        resultados.push({ quadradoNumero, status: 'ok', url: updated.webUrl });
-      }
-    }
-
-    // Atualizar cr4a1_tem_fotos no cabeçalho (opcional)
-    // ... (código já existente, se desejar manter)
-
-    res.json({ resultados });
-  } catch (error) {
-    console.error('Erro ao renomear fotos:', error);
     res.status(500).json({ message: error.message });
   }
 });

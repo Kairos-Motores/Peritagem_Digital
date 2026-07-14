@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '../../hooks/useToast';
 
-export default function AlbumFotos({ os, fotos = [], filial = 'SemFilial', cliente = 'SemCliente', readonly = false, onUpdate }) {
+export default function AlbumFotos({ os, fotos = [], filial = 'SemFilial', cliente = 'SemCliente', readonly = false, onUpdate, onViewFoto }) {
   const [expanded, setExpanded] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
   const [selecionadas, setSelecionadas] = useState([]);
@@ -10,12 +10,9 @@ export default function AlbumFotos({ os, fotos = [], filial = 'SemFilial', clien
   const { success, error } = useToast();
   const userToken = sessionStorage.getItem('dv_token');
 
-  // Fotos já atribuídas a quadrados (nome termina com _N.jpg)
   const fotosComNumero = fotos.filter(f => /_\d+\.jpg$/.test(f.name));
-  // Fotos pendentes (contêm '_temp_')
   const fotosTemp = fotos.filter(f => f.name.includes('_temp_'));
 
-  // Mapeia número → foto (para a grade)
   const fotosPorNumero = {};
   fotosComNumero.forEach(foto => {
     const match = foto.name.match(/_(\d+)\.jpg$/);
@@ -41,7 +38,6 @@ export default function AlbumFotos({ os, fotos = [], filial = 'SemFilial', clien
         const foto = fotosTemp.find(f => f.id === fotoId);
         let itemId = null;
         if (foto && foto.name) {
-          // Extrai o itemId do nome (formato: itemId_temp_guid.jpg)
           const parts = foto.name.split('_temp_');
           if (parts.length > 0) itemId = parts[0];
         }
@@ -84,7 +80,6 @@ export default function AlbumFotos({ os, fotos = [], filial = 'SemFilial', clien
 
   return (
     <div style={{ marginTop: 32, marginBottom: 32 }}>
-      {/* cabeçalho com botões */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, padding: '0 4px' }}>
         <h2 style={{ margin: 0, color: 'var(--md-sys-color-on-surface)', fontSize: '1.1rem' }}>Álbum de Fotos</h2>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -132,7 +127,6 @@ export default function AlbumFotos({ os, fotos = [], filial = 'SemFilial', clien
         </div>
       </div>
 
-      {/* grade de quadrados */}
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
@@ -152,6 +146,11 @@ export default function AlbumFotos({ os, fotos = [], filial = 'SemFilial', clien
                     key={num}
                     whileHover={{ scale: temFoto ? 1.02 : 1.05 }}
                     whileTap={{ scale: 0.97 }}
+                    onClick={() => {
+                      if (temFoto && onViewFoto) {
+                        onViewFoto(foto);
+                      }
+                    }}
                     style={{
                       aspectRatio: '1 / 1',
                       backgroundColor: temFoto ? 'transparent' : 'var(--md-sys-color-surface-variant)',
@@ -193,7 +192,6 @@ export default function AlbumFotos({ os, fotos = [], filial = 'SemFilial', clien
         )}
       </AnimatePresence>
 
-      {/* Modal de seleção */}
       {modalAberto && (
         <div style={{
           position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)',

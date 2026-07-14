@@ -20,15 +20,17 @@ export function InspecaoProvider({ children }) {
   };
 
   // Retoma uma inspeção existente (OS já tem cabeçalho)
-  const retomarInspecao = (os, cabecalhoId) => {
+  const retomarInspecao = (os, cabecalhoId, filial = '', cliente = '') => {
     setInspecaoAtual({
-      id: uuidv4(),               // novo ID de sessão
-      os,                         // mesma OS
-      cabecalhoId,                // ID do cabeçalho já existente
+      id: uuidv4(),
+      os,
+      cabecalhoId,
       inicio: new Date().toISOString(),
       itens: [],
       assinatura: null,
       fotos: [],
+      filial,      // preenche com os dados recebidos
+      cliente,     // preenche com os dados recebidos
     });
   };
 

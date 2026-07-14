@@ -245,15 +245,21 @@ export default function Checklist() {
             try {
               // Gera nome no formato itemId_temp_guid.jpg
               const guid = crypto.randomUUID().slice(0, 6);
-              const nomeArquivo = `${fotoTempItemId}_temp_${guid}.jpg`;
-
+              // No trecho do upload dentro do Checklist.jsx:
+              const nomeArquivo = `${fotoTempItemId}_temp_${crypto.randomUUID().slice(0, 6)}.jpg`;
               const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-foto`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                   'Authorization': `Bearer ${userToken}`,
                 },
-                body: JSON.stringify({ os, fotoBase64: base64, nomeArquivo }),
+                body: JSON.stringify({
+                  os,
+                  filial: inspecaoAtual?.filial || '',
+                  cliente: inspecaoAtual?.cliente || '',
+                  fotoBase64: base64,
+                  nomeArquivo,
+                }),
               });
               if (!res.ok) throw new Error('Falha no upload');
               success('Foto adicionada ao item!');

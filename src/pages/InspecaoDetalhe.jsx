@@ -100,6 +100,8 @@ export default function InspecaoDetalhe() {
       </div>
     ) : null;
 
+  const albumFotos = fotos.filter(f => /_\d+\.jpg$/.test(f.name));
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
       <TopBar title={`OS: ${os}`} />
@@ -179,7 +181,12 @@ export default function InspecaoDetalhe() {
               <FilledButton
                 onClick={() => {
                   const cabecalhoId = cabecalho.cr4a1_peritagem_cabecalhoid;
-                  retomarInspecao(os, cabecalhoId);
+                  retomarInspecao(
+                    os,
+                    cabecalhoId,
+                    cabecalho?.cr4a1_filial || '',
+                    cabecalho?.cr4a1_cliente || ''
+                  );
                   navigate('/checklist');
                 }}
                 style={{ width: '100%', marginTop: 8 }}
@@ -190,17 +197,16 @@ export default function InspecaoDetalhe() {
           </ElevatedCard>
         )}
 
-        {/* Álbum de fotos */}
         <AlbumFotos
           os={os}
-          fotosDefinitivas={fotos}
+          fotos={fotos}
           filial={cabecalho?.cr4a1_filial || 'SemFilial'}
           cliente={cabecalho?.cr4a1_cliente || 'SemCliente'}
           readonly={readonly}
           onUpdate={handleUpdateFotos}
+          onViewFoto={handleViewFoto}
         />
 
-        {/* Itens da Inspeção */}
         <h2 style={{ color: 'var(--md-sys-color-on-surface)', marginTop: 24, marginBottom: 12 }}>
           Itens Avaliados
         </h2>
@@ -249,7 +255,7 @@ export default function InspecaoDetalhe() {
         </div>
       </div>
 
-      {/* Lightbox */}
+      {/* Lightbox com suporte a swipe */}
       <AnimatePresence>
         {selectedFoto && (
           <motion.div
@@ -264,6 +270,36 @@ export default function InspecaoDetalhe() {
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000,
+              touchAction: 'none', // essencial para o swipe funcionar
+            }}
+            onTouchStart={(e) => {
+              // Guarda a posição inicial do toque
+              const touch = e.touches[0];
+              e.currentTarget.dataset.startX = touch.clientX;
+              e.currentTarget.dataset.startY = touch.clientY;
+            }}
+            onTouchEnd={(e) => {
+              const startX = parseFloat(e.currentTarget.dataset.startX);
+              const startY = parseFloat(e.currentTarget.dataset.startY);
+              if (isNaN(startX)) return;
+
+              const touch = e.changedTouches[0];
+              const diffX = touch.clientX - startX;
+              const diffY = touch.clientY - startY;
+
+              // Só considera swipe se o movimento horizontal for maior que o vertical
+              // e maior que 50px
+              if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                e.stopPropagation(); // impede o fecho acidental
+                const idx = albumFotos.findIndex(f => f.id === selectedFoto.id);
+                if (diffX < 0 && idx < albumFotos.length - 1) {
+                  // swipe para a esquerda → próxima
+                  setSelectedFoto(albumFotos[idx + 1]);
+                } else if (diffX > 0 && idx > 0) {
+                  // swipe para a direita → anterior
+                  setSelectedFoto(albumFotos[idx - 1]);
+                }
+              }
             }}
           >
             <motion.div
@@ -285,6 +321,7 @@ export default function InspecaoDetalhe() {
                   fontSize: '2rem',
                   cursor: 'pointer',
                   padding: 8,
+                  zIndex: 10,
                 }}
               >
                 ✕
@@ -293,7 +330,59 @@ export default function InspecaoDetalhe() {
                 src={selectedFoto.url}
                 alt={selectedFoto.name}
                 style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8 }}
+                draggable="false" // evita arraste da imagem
               />
+              {/* Botões de navegação (ainda funcionam como fallback) */}
+              {albumFotos.length > 1 && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const idx = albumFotos.findIndex(f => f.id === selectedFoto.id);
+                      if (idx > 0) setSelectedFoto(albumFotos[idx - 1]);
+                    }}
+                    disabled={albumFotos.findIndex(f => f.id === selectedFoto.id) === 0}
+                    style={{
+                      position: 'absolute',
+                      left: -50,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: '#fff',
+                      fontSize: '3rem',
+                      cursor: 'pointer',
+                      opacity: 0.8,
+                      padding: '0 12px',
+                    }}
+                  >
+                    ‹
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const idx = albumFotos.findIndex(f => f.id === selectedFoto.id);
+                      if (idx < albumFotos.length - 1) setSelectedFoto(albumFotos[idx + 1]);
+                    }}
+                    disabled={albumFotos.findIndex(f => f.id === selectedFoto.id) === albumFotos.length - 1}
+                    style={{
+                      position: 'absolute',
+                      right: -50,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: '#fff',
+                      fontSize: '3rem',
+                      cursor: 'pointer',
+                      opacity: 0.8,
+                      padding: '0 12px',
+                    }}
+                  >
+                    ›
+                  </button>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}
