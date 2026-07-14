@@ -21,7 +21,7 @@ export default function InspecaoDetalhe() {
   const [fotos, setFotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFoto, setSelectedFoto] = useState(null);
-  const [readonly, setReadonly] = useState(false); // true se concluída
+  const [readonly, setReadonly] = useState(false);
 
   const username = sessionStorage.getItem('dv_username');
   const userToken = sessionStorage.getItem('dv_token');
@@ -66,7 +66,6 @@ export default function InspecaoDetalhe() {
     });
     if (!res.ok) throw new Error('Upload falhou');
     const data = await res.json();
-    // Atualiza a lista local removendo qualquer foto antiga com mesmo número e adicionando a nova
     setFotos(prev => {
       const outras = prev.filter(f => !f.name.match(new RegExp(`_foto_${numero}\\.jpg$`)));
       return [...outras, { name: fileName, url: data.url, id: data.id }];
@@ -79,6 +78,15 @@ export default function InspecaoDetalhe() {
   };
 
   const closeFoto = () => setSelectedFoto(null);
+
+  const handleUpdateFotos = async () => {
+    try {
+      const fts = await getFotos(os);
+      setFotos(fts || []);
+    } catch (err) {
+      console.error('Erro ao recarregar fotos:', err);
+    }
+  };
 
   if (loading) return <LoadingScreen message="Carregando detalhes" />;
 
@@ -185,10 +193,11 @@ export default function InspecaoDetalhe() {
         {/* Álbum de fotos */}
         <AlbumFotos
           os={os}
-          fotos={fotos}
-          onUpload={handleUploadFoto}
-          onViewFoto={handleViewFoto}
+          fotosDefinitivas={fotos}
+          filial={cabecalho?.cr4a1_filial || 'SemFilial'}
+          cliente={cabecalho?.cr4a1_cliente || 'SemCliente'}
           readonly={readonly}
+          onUpdate={handleUpdateFotos}
         />
 
         {/* Itens da Inspeção */}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FilledCard } from '../ui/MdCard';
 import './ModeloItem.css';
 
-export default function ModeloItem({ item, onChange, initialResposta }) {
+export default function ModeloItem({ item, onChange, initialResposta, onTirarFoto }) {
   const { cr4a1_item, cr4a1_descricao, cr4a1_var_quant, cr4a1_referencia } = item;
   const opcoes = cr4a1_var_quant ? cr4a1_var_quant.split(';').map(s => s.trim()).filter(Boolean) : [];
   const isBinario = opcoes.length === 2;
@@ -106,6 +106,32 @@ export default function ModeloItem({ item, onChange, initialResposta }) {
         }}
         style={{ width: '100%' }}
       />
+
+      {onTirarFoto && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTirarFoto(cr4a1_item);
+            }}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--md-sys-color-outline)',
+              borderRadius: 20,
+              padding: '4px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              cursor: 'pointer',
+              color: 'var(--md-sys-color-primary)',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>photo_camera</span>
+            <span style={{ fontSize: '0.8rem' }}>Fotos</span>
+          </button>
+        </div>
+      )}
     </FilledCard>
   );
 }

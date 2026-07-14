@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useInspecao } from '../contexts/InspecaoContext';
 import { useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton } from '../components/ui/MdButton';
@@ -22,6 +22,9 @@ export default function Checklist() {
   const [tipoSelecionado, setTipoSelecionado] = useState(null);
   const [tiposSalvos, setTiposSalvos] = useState([]);
   const [salvando, setSalvando] = useState(false);
+
+  const [fotoTempItemId, setFotoTempItemId] = useState(null);
+  const fotoTempInputRef = useRef(null);
 
   const os = inspecaoAtual?.os;
   const userToken = sessionStorage.getItem('dv_token');
@@ -119,6 +122,11 @@ export default function Checklist() {
     }
   };
 
+  const handleTirarFotoItem = (itemId) => {
+    setFotoTempItemId(itemId);
+    fotoTempInputRef.current?.click();
+  };
+
   if (!inspecaoAtual) return <p>Inspeção não encontrada.</p>;
   if (itensModelo.length === 0) return <LoadingScreen message="Preparando checklist" />;
 
@@ -172,7 +180,13 @@ export default function Checklist() {
             transition={{ duration: 0.25, ease: 'easeInOut' }}
           >
             {itensFiltrados.map(item => (
-              <ModeloItem key={item.cr4a1_item} item={item} onChange={(resp) => handleItemChange(item.cr4a1_item, resp)} initialResposta={respostas[item.cr4a1_item]} />
+              <ModeloItem
+                key={item.cr4a1_item}
+                item={item}
+                onChange={(resp) => handleItemChange(item.cr4a1_item, resp)}
+                initialResposta={respostas[item.cr4a1_item]}
+                onTirarFoto={handleTirarFotoItem}
+              />
             ))}
           </motion.div>
         </AnimatePresence>
@@ -214,6 +228,41 @@ export default function Checklist() {
           </motion.div>
         </motion.div>
       </div>
+
+      {/* Input oculto para foto temporária */}
+      <input
+        type="file"
+        accept="image/*"
+        capture="environment"
+        ref={fotoTempInputRef}
+        style={{ display: 'none' }}
+        onChange={async (e) => {
+          const file = e.target.files[0];
+          if (!file || !fotoTempItemId) return;
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            const base64 = reader.result;
+            try {
+              const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-foto-temp`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${userToken}`,
+                },
+                body: JSON.stringify({ os, itemId: fotoTempItemId, fotoBase64: base64 }),
+              });
+              if (!res.ok) throw new Error('Falha no upload temporário');
+              success('Foto adicionada ao item!');
+            } catch (err) {
+              error('Erro ao enviar foto.');
+            } finally {
+              setFotoTempItemId(null);
+              e.target.value = '';
+            }
+          };
+          reader.readAsDataURL(file);
+        }}
+      />
     </div>
   );
 }
