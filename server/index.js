@@ -434,6 +434,96 @@ app.get('/api/validar-os', async (req, res) => {
   }
 });
 
+// Renomear fotos selecionadas para o álbum
+app.post('/api/renomear-fotos-album', async (req, res) => {
+  const { os, selecoes } = req.body;
+  // selecoes: [{ fotoId, quadradoNumero, itemId }]
+  if (!os || !Array.isArray(selecoes)) {
+    return res.status(400).json({ message: 'OS e seleções são obrigatórios' });
+  }
+
+  try {
+    const graphToken = await getGraphToken();
+    const drive = await getDocTecnicosDrive(graphToken);
+    // Pasta definitiva (já conhecida, podemos obtê-la do cabeçalho ou do contexto; como o frontend enviará filial/cliente, podemos usá-los)
+    const { filial, cliente } = req.body;
+    const albumFolder = `Fotos Peritagens/${filial || 'SemFilial'}/${cliente || 'SemCliente'}/${os}/Peritagem`;
+
+    const resultados = [];
+
+    for (const sel of selecoes) {
+      const { fotoId, quadradoNumero, itemId } = sel;
+
+      // Buscar nome original da foto
+      const itemUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/items/${fotoId}`;
+      const itemRes = await fetch(itemUrl, { headers: { Authorization: `Bearer ${graphToken}` } });
+      if (!itemRes.ok) {
+        resultados.push({ quadradoNumero, status: 'erro', message: `Foto ${fotoId} não encontrada` });
+        continue;
+      }
+      const itemData = await itemRes.json();
+      const nomeOriginal = itemData.name;
+
+      // Verificar se o nome contém '_temp_' (formato esperado: itemId_temp_guid.jpg)
+      if (!nomeOriginal.includes('_temp_')) {
+        resultados.push({ quadradoNumero, status: 'erro', message: 'Foto já está no formato final' });
+        continue;
+      }
+
+      // Obter descrição do item (se possível)
+      let descricao = 'foto';
+      if (itemId) {
+        try {
+          const itemSet = await resolveEntitySet('cr4a1_peritagem_b01');
+          const tokenDV = await getAccessToken();
+          const itemQuery = `${process.env.DATAVERSE_ENV_URL}/api/data/v9.2/${itemSet}?$filter=cr4a1_item eq '${itemId}'&$select=cr4a1_descricao`;
+          const itemDescRes = await fetch(itemQuery, { headers: { Authorization: `Bearer ${tokenDV}`, Accept: 'application/json' } });
+          const itemDescData = await itemDescRes.json();
+          if (itemDescData.value?.length > 0) descricao = itemDescData.value[0].cr4a1_descricao || 'foto';
+        } catch { }
+      }
+
+      // Sanitizar descrição
+      const descSanitizada = descricao
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_\-]/g, '')
+        .substring(0, 40);
+
+      const novoNome = `${os}_${descSanitizada}_${quadradoNumero}.jpg`;
+
+      // Renomear via PATCH
+      const renameUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/items/${fotoId}`;
+      const patchBody = { name: novoNome };
+      const renameRes = await fetch(renameUrl, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${graphToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(patchBody),
+      });
+
+      if (!renameRes.ok) {
+        const errText = await renameRes.text();
+        resultados.push({ quadradoNumero, status: 'erro', message: errText });
+      } else {
+        const updated = await renameRes.json();
+        resultados.push({ quadradoNumero, status: 'ok', url: updated.webUrl });
+      }
+    }
+
+    // Atualizar cr4a1_tem_fotos no cabeçalho (opcional)
+    // ... (código já existente, se desejar manter)
+
+    res.json({ resultados });
+  } catch (error) {
+    console.error('Erro ao renomear fotos:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`✅ Servidor API rodando em http://localhost:${PORT}`);
 });

@@ -229,7 +229,7 @@ export default function Checklist() {
         </motion.div>
       </div>
 
-      {/* Input oculto para foto temporária */}
+      {/* Input oculto para foto (upload diretamente na pasta definitiva com nome temporário) */}
       <input
         type="file"
         accept="image/*"
@@ -243,15 +243,19 @@ export default function Checklist() {
           reader.onloadend = async () => {
             const base64 = reader.result;
             try {
-              const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-foto-temp`, {
+              // Gera nome no formato itemId_temp_guid.jpg
+              const guid = crypto.randomUUID().slice(0, 6);
+              const nomeArquivo = `${fotoTempItemId}_temp_${guid}.jpg`;
+
+              const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-foto`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                   'Authorization': `Bearer ${userToken}`,
                 },
-                body: JSON.stringify({ os, itemId: fotoTempItemId, fotoBase64: base64 }),
+                body: JSON.stringify({ os, fotoBase64: base64, nomeArquivo }),
               });
-              if (!res.ok) throw new Error('Falha no upload temporário');
+              if (!res.ok) throw new Error('Falha no upload');
               success('Foto adicionada ao item!');
             } catch (err) {
               error('Erro ao enviar foto.');
