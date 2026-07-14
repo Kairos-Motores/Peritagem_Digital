@@ -7,15 +7,18 @@ import { useToast } from '../hooks/useToast';
 import Logo from "../assets/Medro llogo horizontal-Medro.svg";
 import TopBar from '../components/navigation/TopBar';
 import { ElevatedCard } from '../components/ui/MdCard';
+import { useOffline } from '../contexts/OfflineContext';
+import { db } from '../db/fila';
 
 export default function Cabecalho() {
   const [searchParams] = useSearchParams();
   const os = searchParams.get('os') || '';
-  const clienteInicial = searchParams.get('cliente') || ''; // ← NOVO
+  const clienteInicial = searchParams.get('cliente') || '';
   const { inspecaoAtual, setCabecalhoId } = useInspecao();
   const navigate = useNavigate();
   const { createCabecalho, getUsuarios, getUsuarioLogado, getFilialPeritador } = useDataverse();
   const { success, error } = useToast();
+  const { modoOffline, atualizarLocal } = useOffline();
 
   const username = sessionStorage.getItem('dv_username');
   const [mecanicos, setMecanicos] = useState([]);
@@ -24,7 +27,7 @@ export default function Cabecalho() {
 
   const [form, setForm] = useState({
     cr4a1_os: os,
-    cr4a1_cliente: clienteInicial, // ← preenchido automaticamente
+    cr4a1_cliente: clienteInicial,
     cr4a1_area: '',
     cr4a1_n_serie: '',
     cr4a1_os_retorno: '',
@@ -58,6 +61,11 @@ export default function Cabecalho() {
   });
 
   useEffect(() => {
+    if (modoOffline) {
+      setNomePeritador(username || '');
+      setForm(prev => ({ ...prev, cr4a1_peritador: username || '', cr4a1_filial: '' }));
+      return;
+    }
     if (username) {
       Promise.all([
         getUsuarioLogado(username),
@@ -75,10 +83,12 @@ export default function Cabecalho() {
         setForm(prev => ({ ...prev, cr4a1_peritador: username }));
       });
     }
-    getUsuarios()
-      .then(data => setMecanicos(data?.value || []))
-      .catch(console.warn);
-  }, [username]);
+    if (!modoOffline) {
+      getUsuarios()
+        .then(data => setMecanicos(data?.value || []))
+        .catch(console.warn);
+    }
+  }, [username, modoOffline]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -88,10 +98,23 @@ export default function Cabecalho() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const cabecalhoId = await createCabecalho(form);
-      setCabecalhoId(cabecalhoId);
-      success('Cabeçalho salvo!');
-      navigate('/checklist');
+      if (modoOffline) {
+        const rascunhos = await db.inspecoes.where({ os, status: 'rascunho' }).toArray();
+        if (rascunhos.length > 0) {
+          await atualizarLocal(rascunhos[0].id, { cabecalho: form, status: 'pendente' });
+        } else {
+          // Caso não haja rascunho, cria um novo pendente
+          await atualizarLocal(0, { os, cabecalho: form, respostas: {}, fotos: [], status: 'pendente' });
+        }
+        setCabecalhoId(null);
+        success('Cabeçalho salvo offline!');
+        navigate('/checklist');
+      } else {
+        const cabecalhoId = await createCabecalho(form);
+        setCabecalhoId(cabecalhoId);
+        success('Cabeçalho salvo!');
+        navigate('/checklist');
+      }
     } catch (err) {
       error('Erro ao salvar cabeçalho. ' + err.message);
     }
@@ -113,6 +136,9 @@ export default function Cabecalho() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
       <TopBar title="Cabeçalho" logoSrc={Logo} />
       <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+        {modoOffline && (
+          <p style={{ color: 'var(--md-sys-color-error)', marginBottom: 16 }}>Modo offline – dados serão sincronizados posteriormente.</p>
+        )}
         <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
           <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Identificação do Equipamento</h3>
           {renderInput('OS *', 'cr4a1_os')}
@@ -160,19 +186,30 @@ export default function Cabecalho() {
           </div>
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Mecânico</label>
-            <select
-              name="cr4a1_mecanico"
-              value={form.cr4a1_mecanico}
-              onChange={handleChange}
-              style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid var(--md-sys-color-outline)' }}
-            >
-              <option value="">Selecione...</option>
-              {mecanicos.map(u => (
-                <option key={u.cr4a1_credenciaisid} value={u.cr4a1_title || u.cr4a1_usu_x00e1_rio}>
-                  {u.cr4a1_title || u.cr4a1_usu_x00e1_rio}
-                </option>
-              ))}
-            </select>
+            {modoOffline ? (
+              <input
+                type="text"
+                name="cr4a1_mecanico"
+                value={form.cr4a1_mecanico}
+                onChange={handleChange}
+                placeholder="Nome do mecânico"
+                style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid var(--md-sys-color-outline)' }}
+              />
+            ) : (
+              <select
+                name="cr4a1_mecanico"
+                value={form.cr4a1_mecanico}
+                onChange={handleChange}
+                style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid var(--md-sys-color-outline)' }}
+              >
+                <option value="">Selecione...</option>
+                {mecanicos.map(u => (
+                  <option key={u.cr4a1_credenciaisid} value={u.cr4a1_title || u.cr4a1_usu_x00e1_rio}>
+                    {u.cr4a1_title || u.cr4a1_usu_x00e1_rio}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </ElevatedCard>
 

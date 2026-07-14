@@ -1,26 +1,10 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import MdIcon from '../ui/MdIcon';
 import './FloatingNav.css';
 
 const tabs = [
-  {
-    path: '/home',
-    label: 'Início',
-    icon: 'home',
-    activeIcon: 'home', // poderia ser 'home_filled'
-  },
-  {
-    path: '/nova',
-    label: 'Inspeção',
-    icon: 'add_circle',
-    activeIcon: 'add_circle',
-  },
-  {
-    path: '/historico',
-    label: 'Histórico',
-    icon: 'history',
-    activeIcon: 'history',
-  },
+  { path: '/home', label: 'Início', icon: 'home' },
+  { path: '/nova', label: 'Inspeção', icon: 'add_circle' },
+  { path: '/historico', label: 'Histórico', icon: 'history' },
 ];
 
 export default function FloatingNav() {
@@ -39,9 +23,16 @@ export default function FloatingNav() {
               onClick={() => navigate(tab.path)}
               aria-label={tab.label}
             >
-              <MdIcon className={`nav-icon ${isActive ? 'filled' : 'outlined'}`}>
-                {isActive ? tab.activeIcon : tab.icon}
-              </MdIcon>
+              <span
+                className="material-symbols-outlined nav-icon"
+                style={{
+                  fontVariationSettings: `'FILL' ${isActive ? 1 : 0}, 'wght' 400, 'GRAD' 0, 'opsz' 24`,
+                  fontSize: 26,
+                  transition: 'all 0.2s',
+                }}
+              >
+                {tab.icon}
+              </span>
               <span className="nav-label">{tab.label}</span>
               {isActive && <span className="active-indicator" />}
             </button>

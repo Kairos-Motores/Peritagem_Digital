@@ -2,38 +2,42 @@ import { useState, useEffect, useRef } from 'react';
 import { useInspecao } from '../contexts/InspecaoContext';
 import { useNavigate } from 'react-router-dom';
 import { FilledButton } from '../components/ui/MdButton';
-import BottomNav from '../components/navigation/BottomNav';
 import { useDataverse } from '../hooks/useDataverse';
+import { useOffline } from '../contexts/OfflineContext';
 import FloatingNav from '../components/navigation/FloatingNav';
 
 export default function NovaInspecao() {
   const [os, setOs] = useState('');
-  const [valStatus, setValStatus] = useState(null); // 'validando', 'valida', 'apenas_zb6', 'nao_encontrada', 'erro'
+  const [valStatus, setValStatus] = useState(null);
   const [cliente, setCliente] = useState('');
   const [mensagem, setMensagem] = useState('');
   const { novaInspecao } = useInspecao();
   const navigate = useNavigate();
   const { validarOS } = useDataverse();
+  const { modoOffline, salvarLocal } = useOffline();
   const debounceRef = useRef();
 
   const osTrim = os.trim();
 
-  // Efeito de validação com debounce de 600ms
   useEffect(() => {
+    if (modoOffline) {
+      setValStatus(null);
+      setMensagem('');
+      setCliente('');
+      return;
+    }
     if (!osTrim) {
       setValStatus(null);
       setMensagem('');
       setCliente('');
       return;
     }
-
     setValStatus('validando');
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
         const resultado = await validarOS(osTrim);
         setCliente(resultado.cliente || '');
-
         switch (resultado.status) {
           case 'valida':
             setValStatus('valida');
@@ -56,19 +60,24 @@ export default function NovaInspecao() {
         setMensagem('Erro ao validar OS.');
       }
     }, 600);
-
     return () => clearTimeout(debounceRef.current);
-  }, [osTrim]);
+  }, [osTrim, modoOffline]);
 
-  const podeProsseguir = valStatus === 'valida';
+  const podeProsseguir = modoOffline ? osTrim.length > 0 : valStatus === 'valida';
 
-  const iniciar = () => {
+  const iniciar = async () => {
     if (!podeProsseguir) return;
     novaInspecao(osTrim);
-    navigate(`/cabecalho?os=${encodeURIComponent(osTrim)}&cliente=${encodeURIComponent(cliente)}`);
+    if (modoOffline) {
+      await salvarLocal({ os: osTrim, cabecalho: null, respostas: {}, fotos: [], status: 'rascunho' });
+      navigate(`/cabecalho?os=${encodeURIComponent(osTrim)}`);
+    } else {
+      navigate(`/cabecalho?os=${encodeURIComponent(osTrim)}&cliente=${encodeURIComponent(cliente)}`);
+    }
   };
 
   const statusIcon = () => {
+    if (modoOffline) return null;
     switch (valStatus) {
       case 'validando':
         return <span className="material-symbols-outlined" style={{ color: '#666', animation: 'spin 1s linear infinite' }}>progress_activity</span>;
@@ -87,6 +96,11 @@ export default function NovaInspecao() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: 16, flex: 1 }}>
         <h1>Nova Inspeção</h1>
+        {modoOffline && (
+          <p style={{ color: 'var(--md-sys-color-error)', fontSize: '0.9rem', marginTop: 8 }}>
+            Modo offline – a validação da OS não será feita agora.
+          </p>
+        )}
         <div style={{ position: 'relative', marginTop: 24 }}>
           <md-filled-text-field
             label="Ordem de Serviço (OS)"
@@ -94,13 +108,13 @@ export default function NovaInspecao() {
             onInput={(e) => setOs(e.target.value)}
             style={{ width: '100%' }}
           />
-          {valStatus && (
+          {!modoOffline && valStatus && (
             <div style={{ position: 'absolute', right: 12, top: 18, display: 'flex', alignItems: 'center', gap: 4 }}>
               {statusIcon()}
             </div>
           )}
         </div>
-        {mensagem && (
+        {!modoOffline && mensagem && (
           <p style={{
             marginTop: 8,
             fontSize: '0.85rem',
@@ -112,7 +126,7 @@ export default function NovaInspecao() {
             {mensagem}
           </p>
         )}
-        {podeProsseguir && cliente && (
+        {!modoOffline && podeProsseguir && cliente && (
           <p style={{ marginTop: 8, fontSize: '0.9rem', color: 'var(--md-sys-color-on-surface-variant)' }}>
             Cliente: <strong>{cliente}</strong>
           </p>

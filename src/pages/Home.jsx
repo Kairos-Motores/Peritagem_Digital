@@ -22,6 +22,7 @@ export default function Home() {
   const [modalOS, setModalOS] = useState(null);
   const [modalData, setModalData] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [cardDetalhes, setCardDetalhes] = useState(null);  // guarda o objeto completo do card para o modal
 
   const longPressTimer = useRef(null);
   const isLongPress = useRef(false);
@@ -38,7 +39,9 @@ export default function Home() {
             getCabecalhosPorFilial(filial),
             getInspecoes(),
           ]);
-          const totalItensModelo = modeloItens.length;
+
+          const tiposDoModelo = [...new Set(modeloItens.map(i => i.cr4a1_tipo).filter(Boolean))];
+          const totalTipos = tiposDoModelo.length;
 
           const itensPorOS = {};
           todosItens.forEach(item => {
@@ -49,11 +52,23 @@ export default function Home() {
 
           const cardsData = cabecalhos.map(cab => {
             const os = cab.cr4a1_os;
-            const itensPreenchidos = itensPorOS[os]?.size || 0;
-            const percentual = totalItensModelo > 0
-              ? Math.round((itensPreenchidos / totalItensModelo) * 100)
-              : 0;
+            const itensRespondidosSet = itensPorOS[os] || new Set();
+
+            // Calcula progresso por tipo
+            let somaProgresso = 0;
+            const progressoPorTipo = {};
+            tiposDoModelo.forEach(tipo => {
+              const itensDoTipo = modeloItens.filter(i => i.cr4a1_tipo === tipo);
+              const totalItensTipo = itensDoTipo.length;
+              const respondidosTipo = itensDoTipo.filter(item => itensRespondidosSet.has(item.cr4a1_item)).length;
+              const progressoTipo = totalItensTipo > 0 ? respondidosTipo / totalItensTipo : 0;
+              somaProgresso += progressoTipo;
+              progressoPorTipo[tipo] = { respondidos: respondidosTipo, total: totalItensTipo };
+            });
+
+            const percentual = totalTipos > 0 ? Math.round((somaProgresso / totalTipos) * 100) : 0;
             const concluido = cab.cr4a1_status === 'Concluída' || percentual === 100;
+
             return {
               os,
               peritador: cab.cr4a1_peritador,
@@ -61,6 +76,11 @@ export default function Home() {
               percentual: concluido ? 100 : percentual,
               temFotos: cab.cr4a1_tem_fotos,
               concluido,
+              totalTipos,
+              progressoPorTipo,
+              itensFaltantesPorTipo: Object.entries(progressoPorTipo)
+                .filter(([_, info]) => info.respondidos < info.total)
+                .map(([tipo, info]) => ({ tipo, faltantes: info.total - info.respondidos })),
             };
           });
           setCards(cardsData);
@@ -101,9 +121,15 @@ export default function Home() {
   useEffect(() => {
     if (modalOS) {
       setModalLoading(true);
+      const cardEncontrado = cards.find(c => c.os === modalOS);
       getCabecalhoByOS(modalOS)
         .then(data => {
-          setModalData(data);
+          setModalData({
+            ...data,
+            percentual: cardEncontrado?.percentual,
+            concluido: cardEncontrado?.concluido,
+          });
+          setCardDetalhes(cardEncontrado);
           setModalLoading(false);
         })
         .catch(() => {
@@ -112,8 +138,9 @@ export default function Home() {
         });
     } else {
       setModalData(null);
+      setCardDetalhes(null);
     }
-  }, [modalOS]);
+  }, [modalOS, cards]);
 
   const closeModal = () => {
     setModalOS(null);
@@ -130,7 +157,7 @@ export default function Home() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          style={{ color: 'var(--md-sys-color-on-background)', fontSize: '1.5rem' }}
+          style={{ color: 'var(--md-sys-color-on-background)', fontSize: '1.5rem', fontWeight: 600 }}
         >
           Bem-vindo, {dadosUsuario?.cr4a1_title || username}
         </motion.h1>
@@ -140,17 +167,19 @@ export default function Home() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2, duration: 0.3 }}
-          style={{ marginTop: 24, marginBottom: 24 }}
+          style={{ marginTop: 24, marginBottom: 32 }}
         >
           <FilledButton onClick={() => navigate('/nova')} style={{ width: '100%' }}>
             Nova Inspeção
           </FilledButton>
         </motion.div>
 
-        <h2 style={{ color: 'var(--md-sys-color-on-background)', fontSize: '1.1rem' }}>Inspeções</h2>
+        <h2 style={{ color: 'var(--md-sys-color-on-background)', fontSize: '1.2rem', fontWeight: 500, marginBottom: 16 }}>
+          Inspeções recentes
+        </h2>
 
-        <motion.div layout style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-          {cards.length === 0 && <p>Nenhuma inspeção encontrada.</p>}
+        <motion.div layout style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+          {cards.length === 0 && <p style={{ color: 'var(--md-sys-color-on-surface-variant)' }}>Nenhuma inspeção encontrada.</p>}
           <AnimatePresence>
             {cards.map((card, index) => (
               <motion.div
@@ -172,13 +201,13 @@ export default function Home() {
                 onMouseDownCapture={() => handleMouseDown(card.os)}
                 onMouseUpCapture={(e) => handleMouseUp(card.os, e)}
                 style={{
-                  flex: '1 1 calc(50% - 12px)',
+                  flex: '1 1 calc(50% - 16px)',
                   minWidth: '180px',
                   backgroundColor: card.concluido ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-surface)',
                   color: card.concluido ? '#FFFFFF' : 'var(--md-sys-color-on-surface)',
-                  padding: 12,
-                  borderRadius: 'var(--md-sys-shape-corner-medium)',
-                  boxShadow: 'var(--md-sys-elevation-1)',
+                  padding: 16,
+                  borderRadius: 'var(--md-sys-shape-corner-large)',
+                  boxShadow: card.concluido ? 'var(--md-sys-elevation-2)' : 'var(--md-sys-elevation-1)',
                   cursor: 'pointer',
                   display: 'flex',
                   flexDirection: 'column',
@@ -186,26 +215,36 @@ export default function Home() {
                   position: 'relative',
                   overflow: 'hidden',
                   touchAction: 'manipulation',
-                  fontSize: '0.875rem',
+                  transition: 'all 0.2s cubic-bezier(0.2, 0, 0, 1)',
                 }}
               >
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <strong style={{ fontSize: '1rem' }}>OS: {card.os}</strong>
-                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <strong style={{ fontSize: '1rem', fontWeight: 600 }}>OS: {card.os}</strong>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       {card.temFotos && (
-                        <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: 'var(--md-sys-color-primary)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: card.concluido ? '#fff' : 'var(--md-sys-color-primary)' }}>
                           image
                         </span>
                       )}
-                      {card.concluido && <span style={{ fontSize: '0.75rem' }}>✓ Concluída</span>}
+                      {card.concluido && (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 500, opacity: 0.9 }}>✓ Concluída</span>
+                      )}
                     </div>
                   </div>
-                  <p style={{ fontSize: '0.875rem', opacity: 0.8, marginBottom: 12 }}>
+                  <p style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: 16, fontWeight: 400 }}>
                     {card.peritador || 'N/D'}
                   </p>
                 </div>
-                <ProgressBar percentual={card.percentual} concluido={card.concluido} />
+                <ProgressBar
+                  percentual={card.percentual}
+                  concluido={card.concluido}
+                  tooltip={
+                    !card.concluido && card.itensFaltantesPorTipo.length > 0
+                      ? `Faltam itens em: ${card.itensFaltantesPorTipo.map(t => t.tipo).join(', ')}`
+                      : null
+                  }
+                />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -213,6 +252,7 @@ export default function Home() {
       </div>
       <FloatingNav />
 
+      {/* Modal de Resumo (toque prolongado) com detalhes do progresso */}
       {modalOS && createPortal(
         <motion.div
           className="modal-overlay"
@@ -220,23 +260,24 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.3 }}
+          style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.4)' }}
         >
           <motion.div
             className="modal-card"
             onClick={(e) => e.stopPropagation()}
-            style={{ position: 'relative' }}
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            style={{ position: 'relative', padding: 28, maxWidth: 400, width: '90%' }}
+            initial={{ opacity: 0, scale: 0.8, y: 30 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            exit={{ opacity: 0, scale: 0.8, y: 30 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
           >
-            <button className="modal-close" onClick={closeModal}>✕</button>
-            <h2 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Resumo da OS {modalOS}</h2>
+            <button className="modal-close" onClick={closeModal} style={{ top: 12, right: 12 }}>✕</button>
+            <h2 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)', fontSize: '1.3rem' }}>Resumo da OS {modalOS}</h2>
             {modalLoading ? (
-              <p>Carregando...</p>
+              <p style={{ color: 'var(--md-sys-color-on-surface-variant)' }}>Carregando...</p>
             ) : modalData ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.9rem' }}>
                 <p><strong>Cliente:</strong> {modalData.cr4a1_cliente || '-'}</p>
                 <p><strong>Área:</strong> {modalData.cr4a1_area || '-'}</p>
                 <p><strong>Modelo:</strong> {modalData.cr4a1_modelo || '-'}</p>
@@ -250,6 +291,22 @@ export default function Home() {
                 {modalData.cr4a1_data_peritagem_fim && (
                   <p><strong>Data Fim:</strong> {new Date(modalData.cr4a1_data_peritagem_fim).toLocaleString()}</p>
                 )}
+
+                {/* Novo bloco de progresso detalhado */}
+                {!modalData.concluido && cardDetalhes?.itensFaltantesPorTipo?.length > 0 && (
+                  <div style={{ marginTop: 12, padding: 12, backgroundColor: 'var(--md-sys-color-surface-variant)', borderRadius: 12 }}>
+                    <p style={{ fontWeight: 600, marginBottom: 8, color: 'var(--md-sys-color-primary)' }}>Progresso</p>
+                    {cardDetalhes.itensFaltantesPorTipo.map(item => (
+                      <div key={item.tipo} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: 4 }}>
+                        <span>{item.tipo}</span>
+                        <span style={{ color: 'var(--md-sys-color-error)' }}>Faltam {item.faltantes} itens</span>
+                      </div>
+                    ))}
+                    <div style={{ height: 6, backgroundColor: '#eee', borderRadius: 3, marginTop: 8 }}>
+                      <div style={{ width: `${modalData.percentual || 0}%`, height: '100%', backgroundColor: 'var(--md-sys-color-primary)', borderRadius: 3, transition: 'width 0.3s' }} />
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <p>Dados não disponíveis.</p>
@@ -259,7 +316,7 @@ export default function Home() {
                 closeModal();
                 navigate(`/inspecao/${encodeURIComponent(modalOS)}`);
               }}
-              style={{ width: '100%', marginTop: 16 }}
+              style={{ width: '100%', marginTop: 20 }}
             >
               Ver detalhes completos
             </FilledButton>
