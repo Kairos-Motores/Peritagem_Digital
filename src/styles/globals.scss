@@ -7,6 +7,10 @@
   padding: 0;
 }
 
+html {
+  font-size: 16px; // será sobrescrito pelo ThemeContext
+}
+
 html,
 body,
 #root {

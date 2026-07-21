@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDataverse } from '../hooks/useDataverse';
 import { useInspecao } from '../contexts/InspecaoContext';
@@ -22,6 +22,9 @@ export default function InspecaoDetalhe() {
   const [loading, setLoading] = useState(true);
   const [selectedFoto, setSelectedFoto] = useState(null);
   const [readonly, setReadonly] = useState(false);
+
+  const [termoBusca, setTermoBusca] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState(null);
 
   const username = sessionStorage.getItem('dv_username');
   const userToken = sessionStorage.getItem('dv_token');
@@ -86,6 +89,111 @@ export default function InspecaoDetalhe() {
     } catch (err) {
       console.error('Erro ao recarregar fotos:', err);
     }
+  };
+
+  // ------ LÓGICA DE AGRUPAMENTO E FILTRO ------
+  const tipos = useMemo(() => [...new Set(itens.map(i => i.cr4a1_tipo).filter(Boolean))], [itens]);
+
+  const itensAgrupados = useMemo(() => {
+    return itens.reduce((acc, item) => {
+      const tipo = item.cr4a1_tipo || 'Sem Tipo';
+      if (!acc[tipo]) acc[tipo] = [];
+      acc[tipo].push(item);
+      return acc;
+    }, {});
+  }, [itens]);
+
+  const itensFiltrados = useMemo(() => {
+    let lista = itens;
+    if (tipoFiltro) {
+      lista = lista.filter(item => item.cr4a1_tipo === tipoFiltro);
+    }
+    if (termoBusca.trim()) {
+      const termo = termoBusca.toLowerCase();
+      lista = lista.filter(item => (item.cr4a1_descricao || '').toLowerCase().includes(termo));
+    }
+    return lista;
+  }, [itens, tipoFiltro, termoBusca]);
+
+  const renderItemCard = (item) => {
+    const quantStr = item.cr4a1_var_quant || '';
+    const quantPairs = quantStr.split(';').filter(Boolean).map(p => {
+      const [op, qty] = p.split(':');
+      return { opcao: op, quantidade: qty };
+    });
+
+    let refObj = {};
+    try {
+      refObj = JSON.parse(item.cr4a1_referencia || '{}');
+    } catch (e) {
+      refObj = {};
+    }
+    const refPairs = Object.entries(refObj).filter(([_, v]) => v > 0);
+
+    return (
+      <motion.div
+        key={item.cr4a1_peritagem_b04id}
+        layout
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ duration: 0.2 }}
+      >
+        <ElevatedCard style={{ padding: 16 }}>
+          <div style={{ fontWeight: 600, color: 'var(--md-sys-color-primary)', marginBottom: 8 }}>
+            {item.cr4a1_descricao || item.cr4a1_item || 'Item sem nome'}
+          </div>
+          {item.cr4a1_observacao && (
+            <p style={{ marginBottom: 8, fontSize: '0.9rem', color: 'var(--md-sys-color-on-surface)' }}>
+              Obs: {item.cr4a1_observacao}
+            </p>
+          )}
+          {quantPairs.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+              {quantPairs.map((p, idx) => (
+                <span
+                  key={idx}
+                  style={{
+                    backgroundColor: 'var(--md-sys-color-surface-variant)',
+                    color: 'var(--md-sys-color-on-surface-variant)',
+                    padding: '2px 10px',
+                    borderRadius: 16,
+                    fontSize: '0.8rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  {p.opcao}: {p.quantidade}
+                </span>
+              ))}
+            </div>
+          )}
+          {refPairs.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--md-sys-color-on-surface-variant)', marginBottom: 4 }}>
+                Referência:
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {refPairs.map(([key, value], idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      backgroundColor: 'var(--md-sys-color-tertiary-container)',
+                      color: 'var(--md-sys-color-on-tertiary-container)',
+                      padding: '2px 10px',
+                      borderRadius: 16,
+                      fontSize: '0.8rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {key}: {value}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </ElevatedCard>
+      </motion.div>
+    );
   };
 
   if (loading) return <LoadingScreen message="Carregando detalhes" />;
@@ -207,55 +315,127 @@ export default function InspecaoDetalhe() {
           onViewFoto={handleViewFoto}
         />
 
+        {/* ========== SEÇÃO DE ITENS AVALIADOS (COM FILTROS) ========== */}
         <h2 style={{ color: 'var(--md-sys-color-on-surface)', marginTop: 24, marginBottom: 12 }}>
           Itens Avaliados
         </h2>
         {itens.length === 0 && (
           <p style={{ color: 'var(--md-sys-color-on-surface-variant)' }}>Nenhum item registrado.</p>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-          {itens.map(item => {
-            const quantStr = item.cr4a1_var_quant || '';
-            const quantPairs = quantStr.split(';').filter(Boolean).map(p => {
-              const [op, qty] = p.split(':');
-              return { opcao: op, quantidade: qty };
-            });
-            return (
-              <ElevatedCard key={item.cr4a1_peritagem_b04id} style={{ padding: 16 }}>
-                <div style={{ fontWeight: 600, color: 'var(--md-sys-color-primary)', marginBottom: 8 }}>
-                  {item.cr4a1_descricao || item.cr4a1_item || 'Item sem nome'}
-                </div>
-                {item.cr4a1_observacao && (
-                  <p style={{ marginBottom: 8, fontSize: '0.9rem', color: 'var(--md-sys-color-on-surface)' }}>
-                    Obs: {item.cr4a1_observacao}
-                  </p>
-                )}
-                {quantPairs.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {quantPairs.map((p, idx) => (
-                      <span
-                        key={idx}
-                        style={{
-                          backgroundColor: 'var(--md-sys-color-surface-variant)',
-                          color: 'var(--md-sys-color-on-surface-variant)',
-                          padding: '2px 10px',
-                          borderRadius: 16,
-                          fontSize: '0.8rem',
-                          fontWeight: 500,
-                        }}
-                      >
-                        {p.opcao}: {p.quantidade}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </ElevatedCard>
+
+        {itens.length > 0 && (
+          <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Campo de busca */}
+            <div style={{ position: 'relative' }}>
+              <span
+                className="material-symbols-outlined"
+                style={{ position: 'absolute', left: 12, top: 10, color: 'var(--md-sys-color-on-surface-variant)', fontSize: 20 }}
+              >
+                search
+              </span>
+              <input
+                type="text"
+                placeholder="Buscar por nome..."
+                value={termoBusca}
+                onChange={(e) => setTermoBusca(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px 10px 38px',
+                  borderRadius: 28,
+                  border: '1px solid var(--md-sys-color-outline)',
+                  backgroundColor: 'var(--md-sys-color-surface-variant)',
+                  color: 'var(--md-sys-color-on-surface)',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                }}
+              />
+            </div>
+
+            {/* Chips de tipos */}
+            <motion.div layout style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <motion.button
+                layout
+                onClick={() => setTipoFiltro(null)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: 20,
+                  border: '1.5px solid var(--md-sys-color-outline)',
+                  backgroundColor: tipoFiltro === null ? 'var(--md-sys-color-primary)' : 'transparent',
+                  color: tipoFiltro === null ? '#fff' : 'var(--md-sys-color-on-surface)',
+                  fontWeight: tipoFiltro === null ? 600 : 400,
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  transition: 'all 0.2s',
+                }}
+              >
+                Todos
+              </motion.button>
+              {tipos.map(tipo => (
+                <motion.button
+                  layout
+                  key={tipo}
+                  onClick={() => setTipoFiltro(tipo)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 16px',
+                    borderRadius: 20,
+                    border: '1.5px solid var(--md-sys-color-outline)',
+                    backgroundColor: tipoFiltro === tipo ? 'var(--md-sys-color-primary)' : 'transparent',
+                    color: tipoFiltro === tipo ? '#fff' : 'var(--md-sys-color-on-surface)',
+                    fontWeight: tipoFiltro === tipo ? 600 : 400,
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    boxShadow: tipoFiltro === tipo ? 'var(--md-sys-elevation-1)' : 'none',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                    {tipo.toLowerCase().includes('peça') ? 'build' :
+                     tipo.toLowerCase().includes('serviço') ? 'design_services' :
+                     tipo.toLowerCase().includes('elétrico') ? 'bolt' : 'category'}
+                  </span>
+                  <span>{tipo}</span>
+                </motion.button>
+              ))}
+            </motion.div>
+          </div>
+        )}
+
+        {/* Renderização com ou sem agrupamento */}
+        {!tipoFiltro ? (
+          Object.entries(itensAgrupados).map(([tipo, itensDoTipo]) => {
+            const itensVisiveis = itensDoTipo.filter(item =>
+              !termoBusca || (item.cr4a1_descricao || '').toLowerCase().includes(termoBusca.toLowerCase())
             );
-          })}
-        </div>
+            if (itensVisiveis.length === 0) return null;
+            return (
+              <motion.div key={tipo} layout style={{ marginBottom: 20 }}>
+                <h3 style={{ color: 'var(--md-sys-color-primary)', fontSize: '1rem', marginBottom: 8, paddingLeft: 4 }}>
+                  {tipo}
+                </h3>
+                <motion.div layout style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                  <AnimatePresence>
+                    {itensVisiveis.map(item => renderItemCard(item))}
+                  </AnimatePresence>
+                </motion.div>
+              </motion.div>
+            );
+          })
+        ) : (
+          <motion.div layout style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+            <AnimatePresence>
+              {itensFiltrados.map(item => renderItemCard(item))}
+            </AnimatePresence>
+          </motion.div>
+        )}
       </div>
 
-      {/* Lightbox com suporte a swipe */}
+      {/* Lightbox com swipe (mantido igual) */}
       <AnimatePresence>
         {selectedFoto && (
           <motion.div
@@ -270,10 +450,9 @@ export default function InspecaoDetalhe() {
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000,
-              touchAction: 'none', // essencial para o swipe funcionar
+              touchAction: 'none',
             }}
             onTouchStart={(e) => {
-              // Guarda a posição inicial do toque
               const touch = e.touches[0];
               e.currentTarget.dataset.startX = touch.clientX;
               e.currentTarget.dataset.startY = touch.clientY;
@@ -287,16 +466,12 @@ export default function InspecaoDetalhe() {
               const diffX = touch.clientX - startX;
               const diffY = touch.clientY - startY;
 
-              // Só considera swipe se o movimento horizontal for maior que o vertical
-              // e maior que 50px
               if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-                e.stopPropagation(); // impede o fecho acidental
+                e.stopPropagation();
                 const idx = albumFotos.findIndex(f => f.id === selectedFoto.id);
                 if (diffX < 0 && idx < albumFotos.length - 1) {
-                  // swipe para a esquerda → próxima
                   setSelectedFoto(albumFotos[idx + 1]);
                 } else if (diffX > 0 && idx > 0) {
-                  // swipe para a direita → anterior
                   setSelectedFoto(albumFotos[idx - 1]);
                 }
               }
@@ -330,9 +505,8 @@ export default function InspecaoDetalhe() {
                 src={selectedFoto.url}
                 alt={selectedFoto.name}
                 style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8 }}
-                draggable="false" // evita arraste da imagem
+                draggable="false"
               />
-              {/* Botões de navegação (ainda funcionam como fallback) */}
               {albumFotos.length > 1 && (
                 <>
                   <button

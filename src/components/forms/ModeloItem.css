@@ -47,3 +47,6 @@
 .toggle-switch.active .toggle-thumb {
   transform: translateX(20px);
 }
+.card-interactive {
+  overflow-y: hidden !important;
+}

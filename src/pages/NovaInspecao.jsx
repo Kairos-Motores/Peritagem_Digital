@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useInspecao } from '../contexts/InspecaoContext';
 import { useNavigate } from 'react-router-dom';
 import { FilledButton } from '../components/ui/MdButton';
@@ -7,10 +8,15 @@ import { useOffline } from '../contexts/OfflineContext';
 import FloatingNav from '../components/navigation/FloatingNav';
 
 export default function NovaInspecao() {
-  const [os, setOs] = useState('');
+  const [searchParams] = useSearchParams();
+  const osFromUrl = searchParams.get('os') || '';      // ← lê da URL
+  const clienteFromUrl = searchParams.get('cliente') || '';
+
+  const [os, setOs] = useState(osFromUrl);               // inicia com o valor da URL
   const [valStatus, setValStatus] = useState(null);
-  const [cliente, setCliente] = useState('');
+  const [cliente, setCliente] = useState(clienteFromUrl);
   const [mensagem, setMensagem] = useState('');
+
   const { novaInspecao } = useInspecao();
   const navigate = useNavigate();
   const { validarOS } = useDataverse();
@@ -19,11 +25,17 @@ export default function NovaInspecao() {
 
   const osTrim = os.trim();
 
+  // Sempre que o searchParam mudar (ex.: ao clicar num card), atualiza o input
+  useEffect(() => {
+    setOs(osFromUrl);
+    setCliente(clienteFromUrl);
+  }, [osFromUrl, clienteFromUrl]);
+
+  // Validação online da OS
   useEffect(() => {
     if (modoOffline) {
       setValStatus(null);
       setMensagem('');
-      setCliente('');
       return;
     }
     if (!osTrim) {

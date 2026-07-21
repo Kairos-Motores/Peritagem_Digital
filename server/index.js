@@ -288,12 +288,23 @@ app.post('/api/upload-foto', async (req, res) => {
 app.get('/api/fotos', async (req, res) => {
   const { os } = req.query;
   if (!os) return res.status(400).json({ message: 'OS é obrigatória' });
+
+  // Verifica token de sessão (JWT)
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('❌ /api/fotos - Token não fornecido');
     return res.status(401).json({ message: 'Token não fornecido' });
   }
+
   const token = authHeader.split(' ')[1];
-  try { jwt.verify(token, process.env.JWT_SECRET); } catch { return res.status(401).json({ message: 'Token inválido' }); }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('✔ /api/fotos - Token válido para usuário:', decoded.username);
+  } catch (err) {
+    console.error('❌ /api/fotos - Token inválido:', err.message);
+    return res.status(401).json({ message: 'Token inválido ou expirado' });
+  }
+
   try {
     const cabSet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
     const tokenDV = await getAccessToken();
@@ -304,6 +315,7 @@ app.get('/api/fotos', async (req, res) => {
     const cabData = await cabRes.json();
     const cab = cabData.value?.[0];
     if (!cab) return res.status(404).json({ message: 'Cabeçalho não encontrado' });
+
     const filial = cab.cr4a1_filial || 'SemFilial';
     const cliente = cab.cr4a1_cliente || 'SemCliente';
 
@@ -312,11 +324,13 @@ app.get('/api/fotos', async (req, res) => {
     const folderPath = `Fotos Peritagens/${filial}/${cliente}/${os}/Peritagem`;
     const encodedPath = folderPath.split('/').map(encodeURIComponent).join('/');
     const listUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encodedPath}:/children`;
+
     const listRes = await fetch(listUrl, { headers: { Authorization: `Bearer ${graphToken}` } });
     if (!listRes.ok) {
       if (listRes.status === 404) return res.json([]);
       throw new Error(`Erro ao listar fotos: ${await listRes.text()}`);
     }
+
     const listData = await listRes.json();
     const fotos = listData.value
       .filter(item => item.file && item.file.mimeType?.startsWith('image/'))
@@ -326,6 +340,7 @@ app.get('/api/fotos', async (req, res) => {
         url: item.webUrl,
         thumbnailUrl: item.thumbnails?.[0]?.medium?.url || item.webUrl,
       }));
+
     res.json(fotos);
   } catch (error) {
     console.error('Erro ao listar fotos:', error);

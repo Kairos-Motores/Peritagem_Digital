@@ -10,17 +10,20 @@ export function InspecaoProvider({ children }) {
   const novaInspecao = (os) => {
     setInspecaoAtual({
       id: uuidv4(),
-      os,                          // OS da inspeção
-      cabecalhoId: null,          // será preenchido após salvar cabeçalho
+      os,
+      cabecalhoId: null,
       inicio: new Date().toISOString(),
       itens: [],
       assinatura: null,
       fotos: [],
+      filial: '',
+      cliente: '',
+      peritador: '',          // ← NOVO CAMPO
     });
   };
 
   // Retoma uma inspeção existente (OS já tem cabeçalho)
-  const retomarInspecao = (os, cabecalhoId, filial = '', cliente = '') => {
+  const retomarInspecao = (os, cabecalhoId, filial = '', cliente = '', peritador = '') => {
     setInspecaoAtual({
       id: uuidv4(),
       os,
@@ -29,13 +32,19 @@ export function InspecaoProvider({ children }) {
       itens: [],
       assinatura: null,
       fotos: [],
-      filial,      // preenche com os dados recebidos
-      cliente,     // preenche com os dados recebidos
+      filial,
+      cliente,
+      peritador,             // ← NOVO CAMPO
     });
   };
 
   const setCabecalhoId = (id) => {
     setInspecaoAtual(prev => prev ? { ...prev, cabecalhoId: id } : null);
+  };
+
+  // NOVA FUNÇÃO – guarda o nome do peritador no contexto
+  const setPeritador = (nome) => {
+    setInspecaoAtual(prev => prev ? { ...prev, peritador: nome } : null);
   };
 
   const adicionarItem = (item) => {
@@ -54,8 +63,9 @@ export function InspecaoProvider({ children }) {
     <InspecaoContext.Provider value={{
       inspecaoAtual,
       novaInspecao,
-      retomarInspecao,   // ← nova função
+      retomarInspecao,
       setCabecalhoId,
+      setPeritador,            // ← exporta a nova função
       adicionarItem,
       adicionarFoto,
       definirAssinatura,

@@ -155,7 +155,8 @@ export function useDataverse() {
   const getItensByOS = async (os) => {
     const entitySet = await resolveEntitySet('cr4a1_peritagem_b04');
     const filter = `$filter=cr4a1_os eq '${encodeURIComponent(os)}'`;
-    const data = await callApi(`/${entitySet}?${filter}`);
+    const select = `&$select=cr4a1_item,cr4a1_descricao,cr4a1_observacao,cr4a1_var_quant,cr4a1_referencia,cr4a1_tipo`;
+    const data = await callApi(`/${entitySet}?${filter}${select}`);
     return data?.value || [];
   };
 
@@ -167,7 +168,16 @@ export function useDataverse() {
     return osList;
   };
 
-  const upsertItemResposta = async (os, itemId, quantString, observacao, descricao) => {
+  const upsertItemResposta = async (
+    os,
+    itemId,
+    quantString,
+    observacao,
+    descricao,
+    tipo,                // 6º parâmetro – o nome do tipo (ex: "Peça")
+    peritador,           // 7º parâmetro – nome do peritador
+    referenciaJson = ''  // 8º parâmetro – JSON da referência
+  ) => {
     const entitySet = await resolveEntitySet('cr4a1_peritagem_b04');
     const filter = `$filter=cr4a1_os eq '${encodeURIComponent(os)}' and cr4a1_item eq '${encodeURIComponent(itemId)}'`;
     const existente = await callApi(`/${entitySet}?${filter}`);
@@ -176,14 +186,21 @@ export function useDataverse() {
     const payload = {
       cr4a1_os: os,
       cr4a1_item: itemId,
+      cr4a1_descricao: descricao || '',
       cr4a1_observacao: observacao || '',
       cr4a1_var_quant: quantString,
-      cr4a1_descricao: descricao || '',
+      cr4a1_tipo: tipo || '',
+      cr4a1_peritador: peritador || '',
+      cr4a1_referencia: referenciaJson || '',
     };
 
     if (registro) {
-      const idField = `${entitySet}id`;
-      await callApi(`/${entitySet}(${registro[idField]})`, 'PATCH', payload);
+      const idField = Object.keys(registro).find(key => key.endsWith('id'));
+      if (idField) {
+        await callApi(`/${entitySet}(${registro[idField]})`, 'PATCH', payload);
+      } else {
+        throw new Error('Não foi possível encontrar o ID do registo');
+      }
     } else {
       await callApi(`/${entitySet}`, 'POST', payload);
     }
@@ -194,7 +211,17 @@ export function useDataverse() {
       const quantString = Object.entries(resposta.quantidades)
         .map(([op, qty]) => `${op}:${qty}`)
         .join(';');
-      await upsertItemResposta(os, resposta.item_id, quantString, resposta.observacao, resposta.descricao);
+      const referenciaJson = JSON.stringify(resposta.referencia || {});
+      await upsertItemResposta(
+        os,
+        resposta.item_id,
+        quantString,
+        resposta.observacao,
+        resposta.descricao,
+        resposta.tipo,          // 6º → tipo
+        resposta.peritador,     // 7º → peritador
+        referenciaJson          // 8º → referência em JSON
+      );
     }
   };
 
@@ -227,13 +254,12 @@ export function useDataverse() {
   };
 
   const getFotos = async (os) => {
-    const token = user?.token;
+    const token = sessionStorage.getItem('dv_token'); // ⚠️ token direto do sessionStorage
+    if (!token) throw new Error('Token não disponível');
     const res = await fetch(`${import.meta.env.VITE_API_URL}/fotos?os=${encodeURIComponent(os)}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error('Erro ao carregar fotos');
+    if (!res.ok) throw new Error(`Erro ao carregar fotos (${res.status})`);
     return res.json();
   };
 
@@ -244,6 +270,28 @@ export function useDataverse() {
     });
     if (!res.ok) throw new Error('Erro ao validar OS');
     return res.json();
+  };
+
+  const getOSPendentes = async (filial) => {
+    if (!filial) return [];
+
+    const baseMedroSet = await resolveEntitySet('cr4a1_base_medro');
+    const zb6Set = await resolveEntitySet('cr4a1_zb6_relatorio');
+
+    // 1. Busca as OS da base_medro na filial, setor 'PCP' (máx. 50)
+    const filterBase = `$filter=cr4a1_unidade eq '${encodeURIComponent(filial)}' and cr4a1_setor eq 'PCP'&$select=cr4a1_os_comp,cr4a1_cliente&$top=50`;
+    const dataBase = await callApi(`/${baseMedroSet}?${filterBase}`);
+    const osBase = dataBase?.value || [];
+
+    if (osBase.length === 0) return [];
+
+    // 2. Busca todas as OS da ZB6 que possuem data de entrada NULA
+    const filterZb6 = `$filter=cr4a1_zb6_dtentr eq null&$select=cr4a1_novacoluna`;
+    const dataZb6 = await callApi(`/${zb6Set}?${filterZb6}`);
+    const zb6Codes = (dataZb6?.value || []).map(item => item.cr4a1_novacoluna);
+
+    // 3. Retorna apenas as OS da base que estão na ZB6 com dtentr nula
+    return osBase.filter(item => zb6Codes.includes(item.cr4a1_os_comp));
   };
 
   return {
@@ -265,5 +313,6 @@ export function useDataverse() {
     getCabecalhosPorFilial,
     getFotos,
     validarOS,
+    getOSPendentes,
   };
 }
