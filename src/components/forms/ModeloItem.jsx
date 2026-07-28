@@ -163,7 +163,25 @@ function ControleTipo({ tipo, opcoes, valor, onChange, nomeRadio, onStepperClick
   );
 }
 
-export default function ModeloItem({ item, onChange, initialResposta, onTirarFoto, onCopiarResposta, onItemComplete, onStepperClick, isEditing, onFocusItem, onBlurItem, onNextItem, ultimaFoto, onViewFoto, ...rest }) {
+// Adicionada prop fotosCount e garantida a desestruturação de onRemoveFoto
+export default function ModeloItem({
+  item,
+  onChange,
+  initialResposta,
+  onTirarFoto,
+  onCopiarResposta,
+  onItemComplete,
+  onStepperClick,
+  isEditing,
+  onFocusItem,
+  onBlurItem,
+  onNextItem,
+  ultimaFoto,
+  onViewFoto,
+  onRemoveFoto, // agora recebida corretamente
+  fotosCount = 0, // novo: contagem de fotos para este item
+  ...rest
+}) {
   const {
     cr4a1_item, cr4a1_descricao, cr4a1_var_quant,
     cr4a1_referencia: refOpcoesStr, cr4a1_tipolinha, cr4a1_tiporeferencia, cr4a1_tipo,
@@ -188,7 +206,6 @@ export default function ModeloItem({ item, onChange, initialResposta, onTirarFot
   });
   const [observacao, setObservacao] = useState(initialResposta?.observacao || '');
   const [previousValorItem, setPreviousValorItem] = useState(null);
-  const [fotosCount, setFotosCount] = useState(0);
   const [wasComplete, setWasComplete] = useState(false);
 
   useEffect(() => {
@@ -333,7 +350,7 @@ export default function ModeloItem({ item, onChange, initialResposta, onTirarFot
           </button>
         )}
         {onTirarFoto && (
-          <button type="button" onClick={(e) => { e.stopPropagation(); onTirarFoto(cr4a1_item); setFotosCount(prev => prev + 1); }} style={{ background: 'transparent', border: '1px solid var(--md-sys-color-outline)', borderRadius: 20, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: 'var(--md-sys-color-primary)' }}>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onTirarFoto(cr4a1_item); }} style={{ background: 'transparent', border: '1px solid var(--md-sys-color-outline)', borderRadius: 20, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: 'var(--md-sys-color-primary)' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>photo_camera</span> Fotos ({fotosCount})
           </button>
         )}

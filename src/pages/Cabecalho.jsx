@@ -8,7 +8,7 @@ import Logo from "../assets/Medro llogo horizontal-Medro.svg";
 import TopBar from '../components/navigation/TopBar';
 import { ElevatedCard } from '../components/ui/MdCard';
 import { useOffline } from '../contexts/OfflineContext';
-import { db } from '../db/fila';
+import { salvarInspecaoOffline } from '../db/offlineStore';
 
 export default function Cabecalho() {
   const [searchParams] = useSearchParams();
@@ -18,7 +18,7 @@ export default function Cabecalho() {
   const navigate = useNavigate();
   const { createCabecalho, getUsuarios, getUsuarioLogado, getFilialPeritador } = useDataverse();
   const { success, error } = useToast();
-  const { modoOffline, atualizarLocal } = useOffline();
+  const { modoOffline } = useOffline();
 
   const username = sessionStorage.getItem('dv_username');
   const [mecanicos, setMecanicos] = useState([]);
@@ -99,13 +99,7 @@ export default function Cabecalho() {
     e.preventDefault();
     try {
       if (modoOffline) {
-        const rascunhos = await db.inspecoes.where({ os, status: 'rascunho' }).toArray();
-        if (rascunhos.length > 0) {
-          await atualizarLocal(rascunhos[0].id, { cabecalho: form, status: 'pendente' });
-        } else {
-          // Caso não haja rascunho, cria um novo pendente
-          await atualizarLocal(0, { os, cabecalho: form, respostas: {}, fotos: [], status: 'pendente' });
-        }
+        await salvarInspecaoOffline({ os, cabecalho: form, respostas: {}, fotos: [] });
         setCabecalhoId(null);
         success('Cabeçalho salvo offline!');
         navigate('/checklist');

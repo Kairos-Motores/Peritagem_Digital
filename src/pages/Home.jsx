@@ -10,6 +10,8 @@ import TopBar from '../components/navigation/TopBar';
 import FloatingNav from '../components/navigation/FloatingNav';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from '../assets/Medro llogo horizontal-Medro.svg';
+import { useOffline } from '../contexts/OfflineContext';
+import { listarPendentes } from '../db/offlineStore';
 
 export default function Home() {
   const username = sessionStorage.getItem('dv_username');
@@ -21,6 +23,7 @@ export default function Home() {
     getCabecalhoByOS,
     getOSPendentes,
   } = useDataverse();
+  const { modoOffline } = useOffline();
 
   const [dadosUsuario, setDadosUsuario] = useState(null);
   const [cards, setCards] = useState([]);
@@ -55,6 +58,24 @@ export default function Home() {
       try {
         if (!username) return;
         setLoading(true);
+
+        if (modoOffline) {
+          const inspecoes = await listarPendentes();
+          const cardsOffline = inspecoes.map(ins => ({
+            os: ins.os,
+            peritador: ins.cabecalho?.cr4a1_peritador || 'N/D',
+            status: 'Pendente',
+            percentual: 0,
+            concluido: false,
+            temFotos: false,
+            offline: true,
+          }));
+          setCards(cardsOffline);
+          setOsPendentes([]);
+          setLoading(false);
+          return;
+        }
+
         const userData = await getUsuarioLogado(username);
         setDadosUsuario(userData);
         const filial = userData?.cr4a1_filial;
@@ -124,9 +145,9 @@ export default function Home() {
       }
     };
 
-    fetchDataRef.current = fetchData;   // armazena a função mais recente
-    fetchData();                        // executa na montagem
-  }, [username]);
+    fetchDataRef.current = fetchData;
+    fetchData();
+  }, [username, modoOffline]);
 
   // Pull‑to‑refresh handlers
   const handleTouchStart = (e) => {
@@ -364,6 +385,11 @@ export default function Home() {
                         {card.concluido && (
                           <span style={{ fontSize: '0.75rem', fontWeight: 500, opacity: 0.9 }}>
                             ✓ Concluída
+                          </span>
+                        )}
+                        {card.offline && (
+                          <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', color: '#D97706' }}>
+                            cloud_off
                           </span>
                         )}
                       </div>

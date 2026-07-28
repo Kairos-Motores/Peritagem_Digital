@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../db/fila';
 import { useDataverse } from './useDataverse';
 import { useNetworkStatus } from './useNetworkStatus';
@@ -9,43 +9,64 @@ export function useModeloOffline() {
   const isOnline = useNetworkStatus();
   const { getModeloItens } = useDataverse();
 
+  // Guarda a função getModeloItens numa ref para não mudar a cada render
+  const getModeloItensRef = useRef(getModeloItens);
+  useEffect(() => {
+    getModeloItensRef.current = getModeloItens;
+  }, [getModeloItens]);
+
   const carregarCache = useCallback(async () => {
-    return await db.modelo.toArray();
+    try {
+      return await db.modelo.toArray();
+    } catch (e) {
+      // Se a tabela não existir, devolve array vazio
+      return [];
+    }
   }, []);
 
   const atualizarCache = useCallback(async (itens) => {
-    await db.modelo.clear();
-    await db.modelo.bulkPut(itens);
+    try {
+      await db.modelo.clear();
+      await db.modelo.bulkPut(itens);
+    } catch (e) {
+      console.error('Erro ao atualizar cache do modelo:', e);
+    }
   }, []);
 
   useEffect(() => {
+    let cancelado = false;
+
     const fetchModelo = async () => {
       setLoading(true);
       try {
         if (isOnline) {
-          const itens = await getModeloItens();
+          const itens = await getModeloItensRef.current();
           if (itens && itens.length > 0) {
             await atualizarCache(itens);
-            setItensModelo(itens);
+            if (!cancelado) setItensModelo(itens);
           } else {
             const cache = await carregarCache();
-            setItensModelo(cache);
+            if (!cancelado) setItensModelo(cache);
           }
         } else {
           const cache = await carregarCache();
-          setItensModelo(cache);
+          if (!cancelado) setItensModelo(cache);
         }
       } catch (error) {
         console.error('Erro ao carregar modelo:', error);
         const cache = await carregarCache();
-        setItensModelo(cache);
+        if (!cancelado) setItensModelo(cache);
       } finally {
-        setLoading(false);
+        if (!cancelado) setLoading(false);
       }
     };
 
     fetchModelo();
-  }, [isOnline, getModeloItens, atualizarCache, carregarCache]);
+
+    return () => {
+      cancelado = true;
+    };
+  }, [isOnline, carregarCache, atualizarCache]);
 
   return { itensModelo, loading };
 }

@@ -5,7 +5,6 @@ import { FilledButton, OutlinedButton } from '../components/ui/MdButton';
 import TopBar from '../components/navigation/TopBar';
 import ModeloItem from '../components/forms/ModeloItem';
 import { useDataverse } from '../hooks/useDataverse';
-import { db } from '../db/fila';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import { useToast } from '../hooks/useToast';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -13,6 +12,8 @@ import Logo from '../assets/Medro llogo horizontal-Medro.svg';
 import { useOffline } from '../contexts/OfflineContext';
 import { useAudioFeedback } from '../hooks/useAudioFeedback';
 import { useFirstTimeTips } from '../hooks/useFirstTimeTips';
+import { useModeloOffline } from '../hooks/useModeloOffline';
+import { salvarInspecaoOffline, obterInspecaoPorOS } from '../db/offlineStore';
 
 function formatDistanceToNow(date) {
   const minutes = Math.round((Date.now() - date.getTime()) / 60000);
@@ -25,12 +26,12 @@ export default function Checklist() {
   const { inspecaoAtual } = useInspecao();
   const navigate = useNavigate();
   const { success, error, info } = useToast();
-  const { getModeloItens, getItensByOS, salvarTipo, updateStatusCabecalho } = useDataverse();
-  const { modoOffline, atualizarLocal } = useOffline();
+  const { salvarTipo, updateStatusCabecalho, getItensByOS } = useDataverse();
+  const { modoOffline } = useOffline();
   const { playSuccess, playComplete, vibrate, playClick } = useAudioFeedback();
   const { show: showTips, markSeen } = useFirstTimeTips();
+  const { itensModelo, loading: modeloLoading } = useModeloOffline();
 
-  const [itensModelo, setItensModelo] = useState([]);
   const [respostas, setRespostas] = useState({});
   const [tipoSelecionado, setTipoSelecionado] = useState(null);
   const [tiposSalvos, setTiposSalvos] = useState([]);
@@ -41,13 +42,14 @@ export default function Checklist() {
   const [lastModified, setLastModified] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
-  const [ultimaFoto, setUltimaFoto] = useState(null);
+  // Mapa de fotos por item para exibição de miniaturas
+  const [fotos, setFotos] = useState({}); // { [itemId]: [ { id, thumbnail, nome, ... } ] }
   const [fotoAmpliada, setFotoAmpliada] = useState(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Pesquisa e filtros
   const [termoBuscaItem, setTermoBuscaItem] = useState('');
-  const [filtroStatus, setFiltroStatus] = useState('todos'); // 'todos', 'pendentes', 'concluidos'
+  const [filtroStatus, setFiltroStatus] = useState('todos');
 
   const [fotoTempItemId, setFotoTempItemId] = useState(null);
   const fotoTempInputRef = useRef(null);
@@ -59,9 +61,7 @@ export default function Checklist() {
 
   // Aviso ao fechar a aba/janela
   useEffect(() => {
-    const handler = (e) => {
-      if (dirty) { e.preventDefault(); e.returnValue = ''; }
-    };
+    const handler = (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [dirty]);
@@ -78,9 +78,38 @@ export default function Checklist() {
 
   useEffect(() => {
     if (!os) return;
-    if (modoOffline) { setItensModelo([]); return; }
-    Promise.all([getModeloItens(), getItensByOS(os)]).then(([modelo, itensSalvos]) => {
-      setItensModelo(modelo);
+    if (modoOffline) {
+      obterInspecaoPorOS(os).then(inspecao => {
+        if (inspecao) {
+          setRespostas(inspecao.respostas || {});
+          const tiposPersistidos = new Set();
+          Object.values(inspecao.respostas || {}).forEach(r => {
+            const modeloItem = itensModelo.find(m => m.cr4a1_item === r.item_id);
+            if (modeloItem) tiposPersistidos.add(modeloItem.cr4a1_tipo);
+          });
+          setTiposSalvos([...tiposPersistidos]);
+
+          // Carrega fotos do IndexedDB – estrutura já contém id, url, name
+          const fotosPorItem = {};
+          if (inspecao.fotos) {
+            inspecao.fotos.forEach(f => {
+              if (!fotosPorItem[f.itemId]) fotosPorItem[f.itemId] = [];
+              fotosPorItem[f.itemId].push({
+                id: f.id,
+                thumbnail: f.url || f.base64,
+                nome: f.name || f.nomeArquivo,
+                itemId: f.itemId,
+              });
+            });
+          }
+          setFotos(fotosPorItem);
+        }
+      }).catch(console.error);
+      return;
+    }
+    // Online
+    if (itensModelo.length === 0) return;
+    getItensByOS(os).then(itensSalvos => {
       const respostasIniciais = {};
       const tiposPersistidos = new Set();
       itensSalvos.forEach(item => {
@@ -99,20 +128,19 @@ export default function Checklist() {
           item_id: item.cr4a1_item, descricao: item.cr4a1_descricao || '', observacao: item.cr4a1_observacao || '',
           quantidades: quantObj, referencia: refObj, tipo: item.cr4a1_tipo || '', peritador: inspecaoAtual?.peritador || '', completo,
         };
-        const modeloItem = modelo.find(m => m.cr4a1_item === item.cr4a1_item);
+        const modeloItem = itensModelo.find(m => m.cr4a1_item === item.cr4a1_item);
         if (modeloItem) tiposPersistidos.add(modeloItem.cr4a1_tipo);
       });
       setRespostas(respostasIniciais);
       setTiposSalvos([...tiposPersistidos]);
-      const tipos = [...new Set(modelo.map(i => i.cr4a1_tipo).filter(Boolean))];
-      if (tipos.length > 0) setTipoSelecionado(tipos[0]);
+      const tipos = [...new Set(itensModelo.map(i => i.cr4a1_tipo).filter(Boolean))];
+      if (tipos.length > 0 && !tipoSelecionado) setTipoSelecionado(tipos[0]);
     }).catch(err => console.error(err));
-  }, [os, modoOffline]);
+  }, [os, modoOffline, itensModelo]);
 
   const tipos = useMemo(() => [...new Set(itensModelo.map(i => i.cr4a1_tipo).filter(Boolean))], [itensModelo]);
   const itensFiltrados = useMemo(() => tipoSelecionado ? itensModelo.filter(i => i.cr4a1_tipo === tipoSelecionado) : [], [itensModelo, tipoSelecionado]);
 
-  // Filtro por termo de busca e status (aplicado sobre itensFiltrados)
   const itensVisiveis = useMemo(() => {
     let lista = itensFiltrados;
     if (termoBuscaItem.trim()) {
@@ -127,7 +155,7 @@ export default function Checklist() {
     return lista;
   }, [itensFiltrados, termoBuscaItem, filtroStatus, respostas]);
 
-  // Listener de scroll com dependência nos itens filtrados
+  // Listener de scroll
   useEffect(() => {
     const el = listaItensRef.current;
     if (!el) return;
@@ -205,6 +233,46 @@ export default function Checklist() {
     info('Resposta copiada!');
   };
 
+  // Atualiza o array de fotos no IndexedDB (offline) com base no estado atual
+  const atualizarFotosOffline = async (novoMapaFotos) => {
+    const todasFotos = [];
+    Object.entries(novoMapaFotos).forEach(([itemId, fotosArr]) => {
+      fotosArr.forEach(foto => {
+        todasFotos.push({
+          id: foto.id,
+          itemId,
+          url: foto.thumbnail, // url = base64
+          name: foto.nome,
+          base64: foto.thumbnail,
+          nomeArquivo: foto.nome,
+        });
+      });
+    });
+    const existente = await obterInspecaoPorOS(os);
+    await salvarInspecaoOffline({
+      ...(existente || {}),
+      os,
+      cabecalho: existente?.cabecalho || {},
+      respostas: existente?.respostas || {},
+      fotos: todasFotos,
+    });
+  };
+
+  // Remove a última foto de um item
+  const handleRemoveFoto = async (itemId) => {
+    setFotos(prev => {
+      const itemFotos = [...(prev[itemId] || [])];
+      itemFotos.pop(); // remove a última
+      const novoMapa = { ...prev, [itemId]: itemFotos };
+      if (itemFotos.length === 0) delete novoMapa[itemId];
+      // Atualiza offline se necessário
+      if (modoOffline) {
+        atualizarFotosOffline(novoMapa);
+      }
+      return novoMapa;
+    });
+  };
+
   const salvarAtual = async (tipo) => {
     if (!tipo || !os) return;
     const respostasTipo = itensModelo
@@ -213,18 +281,35 @@ export default function Checklist() {
     if (respostasTipo.length === 0) return;
     try {
       if (modoOffline) {
-        const pendentes = await db.inspecoes.where({ os, status: 'pendente' }).toArray();
-        if (pendentes.length > 0) {
-          const atual = pendentes[0];
-          const novasRespostas = { ...atual.respostas };
-          respostasTipo.forEach(r => { novasRespostas[r.item_id] = r; });
-          await atualizarLocal(atual.id, { respostas: novasRespostas });
-        }
+        const existente = await obterInspecaoPorOS(os);
+        // Constrói array de fotos a partir do estado
+        const todasFotos = [];
+        Object.entries(fotos).forEach(([itemId, fotosArr]) => {
+          fotosArr.forEach(foto => {
+            todasFotos.push({
+              id: foto.id,
+              itemId,
+              url: foto.thumbnail,
+              name: foto.nome,
+              base64: foto.thumbnail,
+              nomeArquivo: foto.nome,
+            });
+          });
+        });
+        const dados = {
+          os,
+          cabecalho: existente?.cabecalho || {},
+          respostas: { ...(existente?.respostas || {}), ...respostas },
+          fotos: todasFotos,
+        };
+        await salvarInspecaoOffline(dados);
+        setTiposSalvos(prev => [...new Set([...prev, tipo])]);
+        setDirty(false);
       } else {
         await salvarTipo(os, respostasTipo);
+        setTiposSalvos(prev => [...new Set([...prev, tipo])]);
+        setDirty(false);
       }
-      setTiposSalvos(prev => [...new Set([...prev, tipo])]);
-      setDirty(false);
     } catch (err) {
       console.error('Erro ao salvar tipo em background:', err);
     }
@@ -250,9 +335,7 @@ export default function Checklist() {
   };
 
   // Swipe entre tipos
-  const onTouchStart = (e) => {
-    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  };
+  const onTouchStart = (e) => { touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
   const onTouchEnd = (e) => {
     const touch = e.changedTouches[0];
     const diffX = touch.clientX - touchStart.current.x;
@@ -282,6 +365,9 @@ export default function Checklist() {
       return;
     }
     if (modoOffline) {
+      for (const tipo of tipos) {
+        await salvarAtual(tipo);
+      }
       success('Inspeção salva offline! Será sincronizada quando houver rede.');
       navigate('/home');
       return;
@@ -297,12 +383,6 @@ export default function Checklist() {
         fotos: inspecaoAtual?.fotos || [],
         dataConclusao: new Date().toISOString(),
       };
-      await db.fila.add({
-        motor_id: os,
-        dados: JSON.stringify(inspecaoCompleta),
-        status: 'pendente',
-        created_at: new Date().toISOString(),
-      });
       setDirty(false);
       playComplete();
       success('Inspeção concluída!');
@@ -317,9 +397,7 @@ export default function Checklist() {
     fotoTempInputRef.current?.click();
   };
 
-  const handleItemComplete = (itemId) => {
-    vibrate();
-  };
+  const handleItemComplete = (itemId) => { vibrate(); };
 
   const handleNextItem = useCallback(() => {
     setFocusedIndex(prev => {
@@ -335,13 +413,7 @@ export default function Checklist() {
     });
   }, [itensFiltrados.length]);
 
-  const handleViewFoto = (foto) => {
-    setFotoAmpliada(foto);
-  };
-
-  const handleRemoveFoto = () => {
-    setUltimaFoto(null);
-  };
+  const handleViewFoto = (foto) => { setFotoAmpliada(foto); };
 
   const SalvoIndicator = () =>
     salvoBg ? (
@@ -360,7 +432,7 @@ export default function Checklist() {
     ) : null;
 
   if (!inspecaoAtual) return <p>Inspeção não encontrada.</p>;
-  if (!modoOffline && itensModelo.length === 0) return <LoadingScreen message="Preparando checklist" />;
+  if (!modoOffline && modeloLoading) return <LoadingScreen message="Preparando checklist" />;
   if (modoOffline && itensModelo.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
@@ -380,7 +452,6 @@ export default function Checklist() {
     >
       {showTips && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 2000, pointerEvents: 'none' }}>
-          {/* tooltips já existentes... */}
           <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -542,26 +613,31 @@ export default function Checklist() {
             exit={{ opacity: 0, x: -30 }}
             transition={{ duration: 0.25, ease: 'easeInOut' }}
           >
-            {itensVisiveis.map((item, index) => (
-              <ModeloItem
-                key={item.cr4a1_item}
-                item={item}
-                onChange={(resp) => handleItemChange(item.cr4a1_item, resp)}
-                initialResposta={respostas[item.cr4a1_item]}
-                onTirarFoto={handleTirarFotoItem}
-                onCopiarResposta={handleCopiarResposta}
-                onItemComplete={handleItemComplete}
-                onStepperClick={playClick}
-                isEditing={editingItem === item.cr4a1_item}
-                onFocusItem={() => { setEditingItem(item.cr4a1_item); setFocusedIndex(index); }}
-                onBlurItem={() => setEditingItem(null)}
-                onNextItem={handleNextItem}
-                ultimaFoto={ultimaFoto}
-                onViewFoto={handleViewFoto}
-                onRemoveFoto={handleRemoveFoto}
-                data-item-index={index}
-              />
-            ))}
+            {itensVisiveis.map((item, index) => {
+              const fotosDoItem = fotos[item.cr4a1_item] || [];
+              const ultimaFoto = fotosDoItem.length > 0 ? fotosDoItem[fotosDoItem.length - 1] : null;
+              return (
+                <ModeloItem
+                  key={item.cr4a1_item}
+                  item={item}
+                  onChange={(resp) => handleItemChange(item.cr4a1_item, resp)}
+                  initialResposta={respostas[item.cr4a1_item]}
+                  onTirarFoto={handleTirarFotoItem}
+                  onCopiarResposta={handleCopiarResposta}
+                  onItemComplete={handleItemComplete}
+                  onStepperClick={playClick}
+                  isEditing={editingItem === item.cr4a1_item}
+                  onFocusItem={() => { setEditingItem(item.cr4a1_item); setFocusedIndex(index); }}
+                  onBlurItem={() => setEditingItem(null)}
+                  onNextItem={handleNextItem}
+                  ultimaFoto={ultimaFoto}
+                  onViewFoto={handleViewFoto}
+                  onRemoveFoto={() => handleRemoveFoto(item.cr4a1_item)}
+                  fotosCount={fotosDoItem.length}
+                  data-item-index={index}
+                />
+              );
+            })}
           </motion.div>
         </AnimatePresence>
 
@@ -661,18 +737,45 @@ export default function Checklist() {
           const reader = new FileReader();
           reader.onloadend = async () => {
             const base64 = reader.result;
-            setUltimaFoto({ thumbnail: base64, nome: file.name });
+            const guid = crypto.randomUUID().slice(0, 6);
+            const nomeArquivo = `${fotoTempItemId}_temp_${guid}.jpg`;
+
+            const novaFoto = {
+              id: guid,
+              itemId: fotoTempItemId,
+              thumbnail: base64,      // mantido para miniaturas
+              nome: nomeArquivo,
+              url: base64,            // campo que AlbumFotos espera
+              name: nomeArquivo,      // campo que AlbumFotos espera
+              base64,                 // compatibilidade
+              nomeArquivo,
+            };
+
+            // Atualiza estado local de fotos (miniatura)
+            setFotos(prev => {
+              const novasFotos = [...(prev[fotoTempItemId] || []), novaFoto];
+              return { ...prev, [fotoTempItemId]: novasFotos };
+            });
+
             try {
-              const guid = crypto.randomUUID().slice(0, 6);
-              const nomeArquivo = `${fotoTempItemId}_temp_${guid}.jpg`;
               if (modoOffline) {
-                const pendentes = await db.inspecoes.where({ os, status: 'pendente' }).toArray();
-                if (pendentes.length > 0) {
-                  const atual = pendentes[0];
-                  const fotos = [...(atual.fotos || []), { itemId: fotoTempItemId, base64, nomeArquivo }];
-                  await atualizarLocal(atual.id, { fotos });
-                  success('Foto armazenada offline!');
-                }
+                const existente = await obterInspecaoPorOS(os);
+                const fotosSalvas = [...(existente?.fotos || []), {
+                  id: guid,
+                  itemId: fotoTempItemId,
+                  url: base64,
+                  name: nomeArquivo,
+                  base64,
+                  nomeArquivo,
+                }];
+                await salvarInspecaoOffline({
+                  ...(existente || {}),
+                  os,
+                  cabecalho: existente?.cabecalho || {},
+                  respostas: existente?.respostas || {},
+                  fotos: fotosSalvas,
+                });
+                success('Foto armazenada offline!');
               } else {
                 const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-foto`, {
                   method: 'POST',

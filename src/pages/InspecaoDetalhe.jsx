@@ -9,6 +9,9 @@ import LoadingScreen from '../components/ui/LoadingScreen';
 import { useToast } from '../hooks/useToast';
 import { motion, AnimatePresence } from 'framer-motion';
 import AlbumFotos from '../components/forms/AlbumFotos';
+import { useOffline } from '../contexts/OfflineContext';
+import { obterInspecaoPorOS } from '../db/offlineStore';
+import { db } from '../db/fila'; // acesso direto ao Dexie para buscar modelo offline
 
 export default function InspecaoDetalhe() {
   const { os } = useParams();
@@ -16,6 +19,7 @@ export default function InspecaoDetalhe() {
   const { getCabecalhoByOS, getItensByOS, getFilialPeritador, getFotos } = useDataverse();
   const { retomarInspecao } = useInspecao();
   const { error: toastError, success } = useToast();
+  const { modoOffline } = useOffline();
   const [cabecalho, setCabecalho] = useState(null);
   const [itens, setItens] = useState([]);
   const [fotos, setFotos] = useState([]);
@@ -32,6 +36,69 @@ export default function InspecaoDetalhe() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        if (modoOffline) {
+          // --- Modo offline: carregar tudo do IndexedDB ---
+          const inspecao = await obterInspecaoPorOS(os);
+          if (!inspecao) {
+            toastError('Inspeção não encontrada offline.');
+            navigate('/home');
+            return;
+          }
+
+          // Cabeçalho (pode ser parcial, mas suficiente para exibição)
+          setCabecalho(inspecao.cabecalho || {});
+          setFotos(inspecao.fotos || []);
+          setReadonly(inspecao.cabecalho?.cr4a1_status === 'Concluída');
+
+          // Carregar modelo de itens do cache (IndexedDB)
+          let modeloItens = [];
+          try {
+            modeloItens = await db.modelo.toArray();
+          } catch (e) {
+            console.warn('Modelo offline não encontrado, itens avaliados não serão exibidos.');
+          }
+
+          // Combinar respostas salvas com o modelo de itens
+          const respostas = inspecao.respostas || {};
+          const itensCombinados = Object.values(respostas).map(resp => {
+            const modeloItem = modeloItens.find(m => m.cr4a1_item === resp.item_id);
+            if (!modeloItem) {
+              // Caso raro: item foi removido do modelo atual, exibe com dados mínimos
+              return {
+                cr4a1_peritagem_b04id: resp.item_id,
+                cr4a1_item: resp.item_id,
+                cr4a1_descricao: resp.descricao || 'Item sem descrição',
+                cr4a1_tipo: resp.tipo || '',
+                cr4a1_observacao: resp.observacao || '',
+                cr4a1_var_quant: Object.entries(resp.quantidades || {})
+                  .map(([k, v]) => `${k}:${v}`)
+                  .join(';'),
+                cr4a1_referencia: JSON.stringify(resp.referencia || {}),
+              };
+            }
+
+            // Montar objeto no mesmo formato que a API retorna (simplificado)
+            return {
+              cr4a1_peritagem_b04id: modeloItem.cr4a1_peritagem_b04id || modeloItem.cr4a1_item,
+              cr4a1_item: modeloItem.cr4a1_item,
+              cr4a1_descricao: modeloItem.cr4a1_descricao,
+              cr4a1_tipo: modeloItem.cr4a1_tipo,
+              cr4a1_observacao: resp.observacao || '',
+              // reconstruir cr4a1_var_quant a partir das quantidades salvas
+              cr4a1_var_quant: Object.entries(resp.quantidades || {})
+                .map(([k, v]) => `${k}:${v}`)
+                .join(';'),
+              // a referência também já foi salva como objeto, serializamos de volta
+              cr4a1_referencia: JSON.stringify(resp.referencia || {}),
+            };
+          });
+
+          setItens(itensCombinados);
+          setLoading(false);
+          return;
+        }
+
+        // --- Modo online (código original) ---
         const [cab, its, fts] = await Promise.all([
           getCabecalhoByOS(os),
           getItensByOS(os),
@@ -56,7 +123,7 @@ export default function InspecaoDetalhe() {
       }
     };
     fetchData();
-  }, [os]);
+  }, [os, modoOffline]);
 
   const handleUploadFoto = async (base64, fileName, numero) => {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-foto`, {
@@ -83,11 +150,16 @@ export default function InspecaoDetalhe() {
   const closeFoto = () => setSelectedFoto(null);
 
   const handleUpdateFotos = async () => {
-    try {
-      const fts = await getFotos(os);
-      setFotos(fts || []);
-    } catch (err) {
-      console.error('Erro ao recarregar fotos:', err);
+    if (modoOffline) {
+      const inspecao = await obterInspecaoPorOS(os);
+      setFotos(inspecao?.fotos || []);
+    } else {
+      try {
+        const fts = await getFotos(os);
+        setFotos(fts || []);
+      } catch (err) {
+        console.error('Erro ao recarregar fotos:', err);
+      }
     }
   };
 
