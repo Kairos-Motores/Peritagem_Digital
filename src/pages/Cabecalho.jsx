@@ -9,12 +9,202 @@ import TopBar from '../components/navigation/TopBar';
 import { ElevatedCard } from '../components/ui/MdCard';
 import { useOffline } from '../contexts/OfflineContext';
 import { salvarInspecaoOffline } from '../db/offlineStore';
+import { motion } from 'framer-motion';
+
+// ============================================
+// Componente de campo flutuante com animações
+// ============================================
+function FloatingField({
+  label,
+  name,
+  value,
+  onChange,
+  type = 'text',
+  readOnly = false,
+  placeholder = '',
+  delay = 0,
+}) {
+  const [focused, setFocused] = useState(false);
+  const hasValue = value && value.toString().trim().length > 0;
+  const isActive = focused || hasValue;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay, ease: 'easeOut' }}
+      style={{ marginBottom: 20, position: 'relative' }}
+    >
+      <label
+        style={{
+          position: 'absolute',
+          left: 16,
+          top: isActive ? 8 : 16,
+          fontSize: isActive ? '0.75rem' : '0.95rem',
+          color: readOnly
+            ? 'var(--md-sys-color-on-surface-variant)'
+            : focused
+            ? 'var(--md-sys-color-primary)'
+            : 'var(--md-sys-color-on-surface-variant)',
+          fontWeight: isActive ? 500 : 400,
+          pointerEvents: 'none',
+          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          background: readOnly ? 'var(--md-sys-color-surface-variant)' : 'var(--md-sys-color-surface)',
+          padding: '0 4px',
+          zIndex: 1,
+          borderRadius: 4,
+        }}
+      >
+        {label}
+      </label>
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        readOnly={readOnly}
+        placeholder={focused && !readOnly ? placeholder : ''}
+        onFocus={() => !readOnly && setFocused(true)}
+        onBlur={() => !readOnly && setFocused(false)}
+        style={{
+          width: '100%',
+          padding: '20px 16px 8px 16px',
+          fontSize: '0.95rem',
+          borderRadius: 12,
+          border: `2px solid ${
+            readOnly
+              ? 'var(--md-sys-color-outline)'
+              : focused
+              ? 'var(--md-sys-color-primary)'
+              : 'var(--md-sys-color-outline)'
+          }`,
+          backgroundColor: readOnly
+            ? 'var(--md-sys-color-surface-variant)'
+            : 'var(--md-sys-color-surface)',
+          color: readOnly
+            ? 'var(--md-sys-color-on-surface-variant)'
+            : 'var(--md-sys-color-on-surface)',
+          outline: 'none',
+          boxShadow:
+            focused && !readOnly
+              ? '0 0 0 3px rgba(var(--md-sys-color-primary-rgb, 0, 0, 0), 0.2)'
+              : 'none',
+          transition: 'border-color 0.2s, box-shadow 0.2s, background-color 0.2s',
+          boxSizing: 'border-box',
+          cursor: readOnly ? 'default' : 'text',
+          opacity: readOnly ? 0.85 : 1,
+        }}
+        onMouseEnter={(e) => {
+          if (!focused && !readOnly) e.target.style.borderColor = 'var(--md-sys-color-outline-variant)';
+        }}
+        onMouseLeave={(e) => {
+          if (!focused && !readOnly) e.target.style.borderColor = 'var(--md-sys-color-outline)';
+        }}
+      />
+    </motion.div>
+  );
+}
+
+function ReadOnlyField({ label, value, delay = 0 }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay, ease: 'easeOut' }}
+      style={{ marginBottom: 20 }}
+    >
+      <label
+        style={{
+          display: 'block',
+          marginBottom: 4,
+          fontWeight: 500,
+          fontSize: '0.85rem',
+          color: 'var(--md-sys-color-on-surface-variant)',
+        }}
+      >
+        {label}
+      </label>
+      <input
+        type="text"
+        value={value}
+        readOnly
+        style={{
+          width: '100%',
+          padding: '14px 16px',
+          fontSize: '0.95rem',
+          borderRadius: 12,
+          border: '1px solid var(--md-sys-color-outline)',
+          backgroundColor: 'var(--md-sys-color-surface-variant)',
+          color: 'var(--md-sys-color-on-surface)',
+          outline: 'none',
+          opacity: 0.8,
+          boxSizing: 'border-box',
+          transition: 'all 0.2s',
+        }}
+      />
+    </motion.div>
+  );
+}
+
+function AnimatedSelect({ label, name, value, onChange, options, delay = 0 }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay, ease: 'easeOut' }}
+      style={{ marginBottom: 20 }}
+    >
+      <label
+        style={{
+          display: 'block',
+          marginBottom: 4,
+          fontWeight: 500,
+          fontSize: '0.85rem',
+          color: 'var(--md-sys-color-on-surface-variant)',
+        }}
+      >
+        {label}
+      </label>
+      <select
+        name={name}
+        value={value}
+        onChange={onChange}
+        style={{
+          width: '100%',
+          padding: '14px 16px',
+          fontSize: '0.95rem',
+          borderRadius: 12,
+          border: '1px solid var(--md-sys-color-outline)',
+          backgroundColor: 'var(--md-sys-color-surface)',
+          color: 'var(--md-sys-color-on-surface)',
+          outline: 'none',
+          boxSizing: 'border-box',
+          transition: 'border-color 0.2s, box-shadow 0.2s',
+          appearance: 'none',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23666' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E")`,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'right 12px center',
+          backgroundSize: 20,
+        }}
+        onFocus={(e) => (e.target.style.borderColor = 'var(--md-sys-color-primary)')}
+        onBlur={(e) => (e.target.style.borderColor = 'var(--md-sys-color-outline)')}
+      >
+        <option value="">Selecione...</option>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </motion.div>
+  );
+}
 
 export default function Cabecalho() {
   const [searchParams] = useSearchParams();
   const os = searchParams.get('os') || '';
   const clienteInicial = searchParams.get('cliente') || '';
-  const { inspecaoAtual, setCabecalhoId } = useInspecao();
+  const { inspecaoAtual, novaInspecao, setCabecalhoId } = useInspecao();
   const navigate = useNavigate();
   const { createCabecalho, getUsuarios, getUsuarioLogado, getFilialPeritador } = useDataverse();
   const { success, error } = useToast();
@@ -97,121 +287,132 @@ export default function Cabecalho() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Garante que a inspeção atual existe no contexto antes de prosseguir
+    if (!inspecaoAtual) {
+      if (!os) {
+        error('OS não informada. Não é possível iniciar a inspeção.');
+        return;
+      }
+      novaInspecao(os);
+    }
     try {
       if (modoOffline) {
         await salvarInspecaoOffline({ os, cabecalho: form, respostas: {}, fotos: [] });
         setCabecalhoId(null);
         success('Cabeçalho salvo offline!');
-        navigate('/checklist');
       } else {
         const cabecalhoId = await createCabecalho(form);
         setCabecalhoId(cabecalhoId);
         success('Cabeçalho salvo!');
-        navigate('/checklist');
       }
+      navigate('/checklist');
     } catch (err) {
       error('Erro ao salvar cabeçalho. ' + err.message);
     }
   };
 
-  const renderInput = (label, name, type = 'text') => (
-    <md-filled-text-field
-      key={name}
-      label={label}
-      name={name}
-      value={form[name] || ''}
-      onInput={handleChange}
-      type={type}
-      style={{ width: '100%', marginBottom: 12 }}
-    />
-  );
+  const mecanicosOptions = mecanicos.map(u => ({
+    value: u.cr4a1_title || u.cr4a1_usu_x00e1_rio,
+    label: u.cr4a1_title || u.cr4a1_usu_x00e1_rio,
+  }));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
       <TopBar title="Cabeçalho" logoSrc={Logo} />
       <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         {modoOffline && (
-          <p style={{ color: 'var(--md-sys-color-error)', marginBottom: 16 }}>Modo offline – dados serão sincronizados posteriormente.</p>
+          <motion.p
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{ color: 'var(--md-sys-color-error)', marginBottom: 16 }}
+          >
+            Modo offline – dados serão sincronizados posteriormente.
+          </motion.p>
         )}
-        <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
-          <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Identificação do Equipamento</h3>
-          {renderInput('OS *', 'cr4a1_os')}
-          {renderInput('Cliente', 'cr4a1_cliente')}
-          {renderInput('Área', 'cr4a1_area')}
-          {renderInput('Nº Série', 'cr4a1_n_serie')}
-          {renderInput('OS Retorno', 'cr4a1_os_retorno')}
-        </ElevatedCard>
 
-        <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
-          <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Dados Técnicos</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-            {renderInput('Tensão', 'cr4a1_tensao')}
-            {renderInput('Corrente', 'cr4a1_corrente')}
-            {renderInput('Modelo', 'cr4a1_modelo')}
-            {renderInput('Fabricante', 'cr4a1_fabricante')}
-            {renderInput('Carcaça', 'cr4a1_carcaca')}
-            {renderInput('Potência (CV)', 'cr4a1_potencia_cv')}
-            {renderInput('Potência (kW)', 'cr4a1_potencia_kw')}
-            {renderInput('Tag Cliente', 'cr4a1_tag_cliente')}
-            {renderInput('RPM', 'cr4a1_rpm')}
-            {renderInput('Polos', 'cr4a1_polos')}
-            {renderInput('Classe', 'cr4a1_classe')}
-            {renderInput('FS', 'cr4a1_fs')}
-            {renderInput('IP', 'cr4a1_ip')}
-            {renderInput('CAT', 'cr4a1_cat')}
-            {renderInput('REG', 'cr4a1_reg')}
-            {renderInput('FC', 'cr4a1_fc')}
-            {renderInput('Frequência', 'cr4a1_frequencia')}
-            {renderInput('Peso', 'cr4a1_peso')}
-            {renderInput('Nº REQ', 'cr4a1_n_req')}
-            {renderInput('Tag Kairós', 'cr4a1_tag_kairos')}
-            {renderInput('Comprimento', 'cr4a1_comprimento')}
-            {renderInput('Largura', 'cr4a1_largura')}
-            {renderInput('Altura', 'cr4a1_altura')}
-            {renderInput('ME', 'cr4a1_me')}
-          </div>
-        </ElevatedCard>
+        {/* Card Identificação */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+          <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
+            <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Identificação do Equipamento</h3>
+            <FloatingField label="OS *" name="cr4a1_os" value={form.cr4a1_os} onChange={handleChange} readOnly delay={0} />
+            <FloatingField label="Cliente" name="cr4a1_cliente" value={form.cr4a1_cliente} onChange={handleChange} readOnly delay={0.05} />
+            <FloatingField label="Área" name="cr4a1_area" value={form.cr4a1_area} onChange={handleChange} delay={0.1} />
+            <FloatingField label="Nº Série" name="cr4a1_n_serie" value={form.cr4a1_n_serie} onChange={handleChange} delay={0.15} />
+            <FloatingField label="OS Retorno" name="cr4a1_os_retorno" value={form.cr4a1_os_retorno} onChange={handleChange} delay={0.2} />
+          </ElevatedCard>
+        </motion.div>
 
-        <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
-          <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Equipe</h3>
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Peritador</label>
-            <md-filled-text-field value={nomePeritador} readonly style={{ width: '100%' }} />
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Mecânico</label>
+        {/* Card Dados Técnicos */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
+          <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
+            <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Dados Técnicos</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+              <FloatingField label="Tensão" name="cr4a1_tensao" value={form.cr4a1_tensao} onChange={handleChange} delay={0.25} />
+              <FloatingField label="Corrente" name="cr4a1_corrente" value={form.cr4a1_corrente} onChange={handleChange} delay={0.3} />
+              <FloatingField label="Modelo" name="cr4a1_modelo" value={form.cr4a1_modelo} onChange={handleChange} delay={0.35} />
+              <FloatingField label="Fabricante" name="cr4a1_fabricante" value={form.cr4a1_fabricante} onChange={handleChange} delay={0.4} />
+              <FloatingField label="Carcaça" name="cr4a1_carcaca" value={form.cr4a1_carcaca} onChange={handleChange} delay={0.45} />
+              <FloatingField label="Potência (CV)" name="cr4a1_potencia_cv" value={form.cr4a1_potencia_cv} onChange={handleChange} delay={0.5} />
+              <FloatingField label="Potência (kW)" name="cr4a1_potencia_kw" value={form.cr4a1_potencia_kw} onChange={handleChange} delay={0.55} />
+              <FloatingField label="Tag Cliente" name="cr4a1_tag_cliente" value={form.cr4a1_tag_cliente} onChange={handleChange} delay={0.6} />
+              <FloatingField label="RPM" name="cr4a1_rpm" value={form.cr4a1_rpm} onChange={handleChange} delay={0.65} />
+              <FloatingField label="Polos" name="cr4a1_polos" value={form.cr4a1_polos} onChange={handleChange} delay={0.7} />
+              <FloatingField label="Classe" name="cr4a1_classe" value={form.cr4a1_classe} onChange={handleChange} delay={0.75} />
+              <FloatingField label="FS" name="cr4a1_fs" value={form.cr4a1_fs} onChange={handleChange} delay={0.8} />
+              <FloatingField label="IP" name="cr4a1_ip" value={form.cr4a1_ip} onChange={handleChange} delay={0.85} />
+              <FloatingField label="CAT" name="cr4a1_cat" value={form.cr4a1_cat} onChange={handleChange} delay={0.9} />
+              <FloatingField label="REG" name="cr4a1_reg" value={form.cr4a1_reg} onChange={handleChange} delay={0.95} />
+              <FloatingField label="FC" name="cr4a1_fc" value={form.cr4a1_fc} onChange={handleChange} delay={1.0} />
+              <FloatingField label="Frequência" name="cr4a1_frequencia" value={form.cr4a1_frequencia} onChange={handleChange} delay={1.05} />
+              <FloatingField label="Peso" name="cr4a1_peso" value={form.cr4a1_peso} onChange={handleChange} delay={1.1} />
+              <FloatingField label="Nº REQ" name="cr4a1_n_req" value={form.cr4a1_n_req} onChange={handleChange} delay={1.15} />
+              <FloatingField label="Tag Kairós" name="cr4a1_tag_kairos" value={form.cr4a1_tag_kairos} onChange={handleChange} delay={1.2} />
+              <FloatingField label="Comprimento" name="cr4a1_comprimento" value={form.cr4a1_comprimento} onChange={handleChange} delay={1.25} />
+              <FloatingField label="Largura" name="cr4a1_largura" value={form.cr4a1_largura} onChange={handleChange} delay={1.3} />
+              <FloatingField label="Altura" name="cr4a1_altura" value={form.cr4a1_altura} onChange={handleChange} delay={1.35} />
+              <FloatingField label="ME" name="cr4a1_me" value={form.cr4a1_me} onChange={handleChange} delay={1.4} />
+            </div>
+          </ElevatedCard>
+        </motion.div>
+
+        {/* Card Equipe */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.4 }}>
+          <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
+            <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Equipe</h3>
+            <ReadOnlyField label="Peritador" value={nomePeritador} delay={1.45} />
             {modoOffline ? (
-              <input
-                type="text"
+              <FloatingField
+                label="Mecânico"
                 name="cr4a1_mecanico"
                 value={form.cr4a1_mecanico}
                 onChange={handleChange}
                 placeholder="Nome do mecânico"
-                style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid var(--md-sys-color-outline)' }}
+                delay={1.5}
               />
             ) : (
-              <select
+              <AnimatedSelect
+                label="Mecânico"
                 name="cr4a1_mecanico"
                 value={form.cr4a1_mecanico}
                 onChange={handleChange}
-                style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid var(--md-sys-color-outline)' }}
-              >
-                <option value="">Selecione...</option>
-                {mecanicos.map(u => (
-                  <option key={u.cr4a1_credenciaisid} value={u.cr4a1_title || u.cr4a1_usu_x00e1_rio}>
-                    {u.cr4a1_title || u.cr4a1_usu_x00e1_rio}
-                  </option>
-                ))}
-              </select>
+                options={mecanicosOptions}
+                delay={1.5}
+              />
             )}
-          </div>
-        </ElevatedCard>
+          </ElevatedCard>
+        </motion.div>
 
         <input type="hidden" name="cr4a1_filial" value={form.cr4a1_filial} />
 
-        <FilledButton type="submit" style={{ width: '100%', marginTop: 8 }}>
-          Salvar e Iniciar Checklist
-        </FilledButton>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.6, duration: 0.3 }}
+        >
+          <FilledButton type="submit" style={{ width: '100%', marginTop: 8 }}>
+            Salvar e Iniciar Checklist
+          </FilledButton>
+        </motion.div>
       </form>
     </div>
   );
