@@ -9,10 +9,10 @@ import FloatingNav from '../components/navigation/FloatingNav';
 
 export default function NovaInspecao() {
   const [searchParams] = useSearchParams();
-  const osFromUrl = searchParams.get('os') || '';      // ← lê da URL
+  const osFromUrl = searchParams.get('os') || '';
   const clienteFromUrl = searchParams.get('cliente') || '';
 
-  const [os, setOs] = useState(osFromUrl);               // inicia com o valor da URL
+  const [os, setOs] = useState(osFromUrl);
   const [valStatus, setValStatus] = useState(null);
   const [cliente, setCliente] = useState(clienteFromUrl);
   const [mensagem, setMensagem] = useState('');
@@ -21,17 +21,18 @@ export default function NovaInspecao() {
   const navigate = useNavigate();
   const { validarOS } = useDataverse();
   const { modoOffline, salvarLocal } = useOffline();
-  const debounceRef = useRef();
+  const debounceRef = useRef(null);
+  const inputRef = useRef(null); // ref para o input, útil se quiseres manter foco
 
   const osTrim = os.trim();
 
-  // Sempre que o searchParam mudar (ex.: ao clicar num card), atualiza o input
+  // Atualiza os campos quando os parâmetros da URL mudam
   useEffect(() => {
     setOs(osFromUrl);
     setCliente(clienteFromUrl);
   }, [osFromUrl, clienteFromUrl]);
 
-  // Validação online da OS
+  // Validação online da OS (com debounce)
   useEffect(() => {
     if (modoOffline) {
       setValStatus(null);
@@ -114,14 +115,27 @@ export default function NovaInspecao() {
           </p>
         )}
         <div style={{ position: 'relative', marginTop: 24 }}>
-          <md-filled-text-field
-            label="Ordem de Serviço (OS)"
+          {/* Substituição do md-filled-text-field por um input controlado normal */}
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder="Ordem de Serviço (OS)"
             value={os}
-            onInput={(e) => setOs(e.target.value)}
-            style={{ width: '100%' }}
+            onChange={(e) => setOs(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              fontSize: '1rem',
+              borderRadius: '8px',
+              border: `1px solid var(--md-sys-color-outline)`,
+              backgroundColor: 'var(--md-sys-color-surface-variant)',
+              color: 'var(--md-sys-color-on-surface)',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
           />
           {!modoOffline && valStatus && (
-            <div style={{ position: 'absolute', right: 12, top: 18, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ position: 'absolute', right: 12, top: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
               {statusIcon()}
             </div>
           )}
