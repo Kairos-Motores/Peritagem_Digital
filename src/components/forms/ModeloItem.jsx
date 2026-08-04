@@ -224,8 +224,9 @@ export default function ModeloItem({
       quantidades: itemVal || valorItem,
       referencia: refVal || valorRef,
       tipo: cr4a1_tipo,
+      tipolinha: cr4a1_tipolinha,   // ← ADICIONE ESTA LINHA
     });
-  }, [onChange, cr4a1_item, cr4a1_descricao, observacao, valorItem, valorRef, cr4a1_tipo]);
+  }, [onChange, cr4a1_item, cr4a1_descricao, observacao, valorItem, valorRef, cr4a1_tipo, cr4a1_tipolinha]);
 
   const handleItemChange = (novoValor) => {
     setPreviousValorItem({ ...valorItem });

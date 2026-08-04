@@ -444,6 +444,9 @@ export default function Checklist() {
     );
   }
 
+  // Cor verde para botões de tipo completo
+  const COR_COMPLETO = '#2E7D32';
+
   return (
     <div
       style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}
@@ -487,6 +490,29 @@ export default function Checklist() {
           const completo = tipoCompleto(tipo);
           const salvo = tiposSalvos.includes(tipo) && !completo;
           const isSelected = tipo === tipoSelecionado;
+
+          // Define as cores com base no estado
+          const isVerde = completo;
+          const bgColor = isVerde
+            ? COR_COMPLETO
+            : isSelected
+            ? 'var(--md-sys-color-primary)'
+            : salvo
+            ? 'var(--md-sys-color-primary-container)'
+            : 'transparent';
+
+          const textColor = isVerde || isSelected
+            ? '#fff'
+            : salvo
+            ? 'var(--md-sys-color-on-primary-container)'
+            : 'var(--md-sys-color-on-surface)';
+
+          const borderColor = isVerde
+            ? COR_COMPLETO
+            : isSelected
+            ? 'var(--md-sys-color-primary)'
+            : 'var(--md-sys-color-outline)';
+
           return (
             <motion.button
               key={tipo}
@@ -497,28 +523,33 @@ export default function Checklist() {
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '6px 16px', borderRadius: 20,
-                border: `1.5px solid ${isSelected ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-outline)'}`,
-                backgroundColor: isSelected ? 'var(--md-sys-color-primary)' : (salvo ? 'var(--md-sys-color-primary-container)' : 'transparent'),
-                color: isSelected ? '#fff' : (salvo ? 'var(--md-sys-color-on-primary-container)' : 'var(--md-sys-color-on-surface)'),
-                fontWeight: isSelected ? 600 : 400, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.8rem',
-                boxShadow: isSelected ? 'var(--md-sys-elevation-1)' : 'none', transition: 'all 0.2s',
+                border: `1.5px solid ${borderColor}`,
+                backgroundColor: bgColor,
+                color: textColor,
+                fontWeight: isSelected ? 600 : 400,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                fontSize: '0.8rem',
+                boxShadow: isSelected ? 'var(--md-sys-elevation-1)' : 'none',
+                transition: 'all 0.2s',
               }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 18, fontVariationSettings: "'FILL' 0" }}>
                 {tipo.toLowerCase().includes('peça') ? 'build' : tipo.toLowerCase().includes('serviço') ? 'design_services' : tipo.toLowerCase().includes('elétrico') ? 'bolt' : 'category'}
               </span>
               <span>{tipo}</span>
-              {completo ? (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 2, color: isSelected ? '#fff' : 'var(--md-sys-color-primary)' }}>
+              {completo && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 2, color: '#fff' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
                   <span style={{ fontSize: '0.7rem' }}>ok</span>
                 </span>
-              ) : salvo ? (
+              )}
+              {salvo && !completo && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 2, color: '#D97706' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>save</span>
                   <span style={{ fontSize: '0.7rem' }}>salvo</span>
                 </span>
-              ) : null}
+              )}
             </motion.button>
           );
         })}
