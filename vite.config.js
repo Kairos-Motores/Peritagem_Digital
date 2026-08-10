@@ -9,6 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate', // Atualiza o app automaticamente quando houver nova versão
       includeAssets: ['favicon.svg', 'icons.svg'], // Arquivos da sua pasta public
       manifest: {
+        id: '/', // <--- ADICIONE ESTA LINHA
+        start_url: '/', // <--- ADICIONE ESTA TAMBÉM POR GARANTIA
         name: 'Peritagem Digital',
         short_name: 'Peritagem',
         description: 'Aplicativo de Peritagem Digital',
