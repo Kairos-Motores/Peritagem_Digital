@@ -94,7 +94,7 @@ const CORES_OPCAO = {
   'Fornecer': '#1565C0',
 };
 
-function ItemCard({ item, index }) {
+function ItemCard({ item, index, onViewObservacao }) {
   const tipolinha = item.cr4a1_tipolinha?.toString() || '';
   const tiporeferencia = item.cr4a1_tiporeferencia?.toString() || '';
 
@@ -146,14 +146,26 @@ function ItemCard({ item, index }) {
           boxShadow: 'var(--md-sys-elevation-1)',
         }}
       >
-        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--md-sys-color-primary)', lineHeight: 1.3, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
-          {item.cr4a1_descricao || item.cr4a1_item || 'Item sem nome'}
-        </h4>
-        {item.cr4a1_observacao && (
-          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--md-sys-color-on-surface-variant)', fontStyle: 'italic', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
-            {item.cr4a1_observacao}
-          </p>
-        )}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--md-sys-color-primary)', lineHeight: 1.3, overflowWrap: 'anywhere', wordBreak: 'break-word', flex: 1 }}>
+            {item.cr4a1_descricao || item.cr4a1_item || 'Item sem nome'}
+          </h4>
+          {item.cr4a1_observacao && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onViewObservacao?.(item); }}
+              title="Ver observação"
+              style={{
+                flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 28, height: 28, borderRadius: '50%', border: 'none',
+                backgroundColor: 'var(--md-sys-color-tertiary-container)', color: 'var(--md-sys-color-on-tertiary-container)',
+                cursor: 'pointer', padding: 0,
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>sticky_note_2</span>
+            </button>
+          )}
+        </div>
 
         {/* Chips de quantidades */}
         {opcoesVisiveis.length > 0 && (
@@ -286,6 +298,7 @@ export default function InspecaoDetalhe() {
   const [fotos, setFotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFoto, setSelectedFoto] = useState(null);
+  const [observacaoSelecionada, setObservacaoSelecionada] = useState(null);
   const [readonly, setReadonly] = useState(false);
 
   const [termoBusca, setTermoBusca] = useState('');
@@ -602,7 +615,7 @@ export default function InspecaoDetalhe() {
                 <motion.div layout style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
                   <AnimatePresence>
                     {itensVisiveis.map((item, idx) => (
-                      <ItemCard key={item.cr4a1_peritagem_b04id} item={item} index={idx} />
+                      <ItemCard key={item.cr4a1_peritagem_b04id} item={item} index={idx} onViewObservacao={setObservacaoSelecionada} />
                     ))}
                   </AnimatePresence>
                 </motion.div>
@@ -613,7 +626,7 @@ export default function InspecaoDetalhe() {
           <motion.div layout style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
             <AnimatePresence>
               {itensFiltrados.map((item, idx) => (
-                <ItemCard key={item.cr4a1_peritagem_b04id} item={item} index={idx} />
+                <ItemCard key={item.cr4a1_peritagem_b04id} item={item} index={idx} onViewObservacao={setObservacaoSelecionada} />
               ))}
             </AnimatePresence>
           </motion.div>
@@ -670,6 +683,53 @@ export default function InspecaoDetalhe() {
                   </button>
                 </>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de observação */}
+      <AnimatePresence>
+        {observacaoSelecionada && (
+          <motion.div
+            onClick={() => setObservacaoSelecionada(null)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24,
+            }}
+          >
+            <motion.div
+              onClick={(e) => e.stopPropagation()}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              style={{
+                position: 'relative', width: '100%', maxWidth: 400, maxHeight: '80vh', overflowY: 'auto',
+                backgroundColor: 'var(--md-sys-color-surface)', borderRadius: 20, padding: 20,
+                boxShadow: 'var(--md-sys-elevation-3)',
+              }}
+            >
+              <button
+                onClick={() => setObservacaoSelecionada(null)}
+                style={{
+                  position: 'absolute', top: 12, right: 12, background: 'none', border: 'none',
+                  color: 'var(--md-sys-color-on-surface-variant)', fontSize: '1.4rem', cursor: 'pointer', padding: 4, lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingRight: 24 }}>
+                <span className="material-symbols-outlined" style={{ color: 'var(--md-sys-color-primary)' }}>sticky_note_2</span>
+                <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--md-sys-color-on-surface)', overflowWrap: 'anywhere' }}>
+                  {observacaoSelecionada.cr4a1_descricao || observacaoSelecionada.cr4a1_item || 'Observação'}
+                </h3>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--md-sys-color-on-surface-variant)', lineHeight: 1.5, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                {observacaoSelecionada.cr4a1_observacao}
+              </p>
             </motion.div>
           </motion.div>
         )}

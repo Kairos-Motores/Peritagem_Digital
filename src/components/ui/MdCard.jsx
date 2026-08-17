@@ -1,6 +1,6 @@
-/*import '@material/web/card/elevated-card.js';
-import '@material/web/card/filled-card.js';
-import '@material/web/card/outlined-card.js';*/
+import '@material/web/labs/card/elevated-card.js';
+import '@material/web/labs/card/filled-card.js';
+import '@material/web/labs/card/outlined-card.js';
 
 export function ElevatedCard({ children, ...props }) {
   return <md-elevated-card {...props}>{children}</md-elevated-card>;
