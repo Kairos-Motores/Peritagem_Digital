@@ -23,6 +23,7 @@ function FloatingField({
   readOnly = false,
   placeholder = '',
   delay = 0,
+  required = false,
 }) {
   const [focused, setFocused] = useState(false);
   const hasValue = value && value.toString().trim().length > 0;
@@ -63,6 +64,7 @@ function FloatingField({
         value={value}
         onChange={onChange}
         readOnly={readOnly}
+        required={required && !readOnly}
         placeholder={focused && !readOnly ? placeholder : ''}
         onFocus={() => !readOnly && setFocused(true)}
         onBlur={() => !readOnly && setFocused(false)}
@@ -146,7 +148,7 @@ function ReadOnlyField({ label, value, delay = 0 }) {
   );
 }
 
-function AnimatedSelect({ label, name, value, onChange, options, delay = 0 }) {
+function AnimatedSelect({ label, name, value, onChange, options, delay = 0, required = false }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -169,6 +171,7 @@ function AnimatedSelect({ label, name, value, onChange, options, delay = 0 }) {
         name={name}
         value={value}
         onChange={onChange}
+        required={required}
         style={{
           width: '100%',
           padding: '14px 16px',
@@ -285,8 +288,23 @@ export default function Cabecalho() {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
+  // Campos que o peritador precisa preencher para liberar o checklist
+  const camposObrigatorios = [
+    'cr4a1_area', 'cr4a1_n_serie', 'cr4a1_os_retorno',
+    'cr4a1_tensao', 'cr4a1_corrente', 'cr4a1_modelo', 'cr4a1_fabricante', 'cr4a1_carcaca',
+    'cr4a1_potencia_cv', 'cr4a1_potencia_kw', 'cr4a1_tag_cliente', 'cr4a1_rpm', 'cr4a1_polos',
+    'cr4a1_classe', 'cr4a1_fs', 'cr4a1_ip', 'cr4a1_cat', 'cr4a1_reg', 'cr4a1_fc', 'cr4a1_frequencia',
+    'cr4a1_peso', 'cr4a1_n_req', 'cr4a1_tag_kairos', 'cr4a1_comprimento', 'cr4a1_largura', 'cr4a1_altura',
+    'cr4a1_me', 'cr4a1_mecanico',
+  ];
+  const formCompleto = camposObrigatorios.every(campo => form[campo]?.toString().trim().length > 0);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formCompleto) {
+      error('Preencha todos os campos do cabeçalho antes de continuar.');
+      return;
+    }
     // Garante que a inspeção atual existe no contexto antes de prosseguir
     if (!inspecaoAtual) {
       if (!os) {
@@ -336,9 +354,9 @@ export default function Cabecalho() {
             <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Identificação do Equipamento</h3>
             <FloatingField label="OS *" name="cr4a1_os" value={form.cr4a1_os} onChange={handleChange} readOnly delay={0} />
             <FloatingField label="Cliente" name="cr4a1_cliente" value={form.cr4a1_cliente} onChange={handleChange} readOnly delay={0.05} />
-            <FloatingField label="Área" name="cr4a1_area" value={form.cr4a1_area} onChange={handleChange} delay={0.1} />
-            <FloatingField label="Nº Série" name="cr4a1_n_serie" value={form.cr4a1_n_serie} onChange={handleChange} delay={0.15} />
-            <FloatingField label="OS Retorno" name="cr4a1_os_retorno" value={form.cr4a1_os_retorno} onChange={handleChange} delay={0.2} />
+            <FloatingField label="Área *" name="cr4a1_area" value={form.cr4a1_area} onChange={handleChange} delay={0.1} required />
+            <FloatingField label="Nº Série *" name="cr4a1_n_serie" value={form.cr4a1_n_serie} onChange={handleChange} delay={0.15} required />
+            <FloatingField label="OS Retorno *" name="cr4a1_os_retorno" value={form.cr4a1_os_retorno} onChange={handleChange} delay={0.2} required />
           </ElevatedCard>
         </motion.div>
 
@@ -347,30 +365,30 @@ export default function Cabecalho() {
           <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
             <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Dados Técnicos</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-              <FloatingField label="Tensão" name="cr4a1_tensao" value={form.cr4a1_tensao} onChange={handleChange} delay={0.25} />
-              <FloatingField label="Corrente" name="cr4a1_corrente" value={form.cr4a1_corrente} onChange={handleChange} delay={0.3} />
-              <FloatingField label="Modelo" name="cr4a1_modelo" value={form.cr4a1_modelo} onChange={handleChange} delay={0.35} />
-              <FloatingField label="Fabricante" name="cr4a1_fabricante" value={form.cr4a1_fabricante} onChange={handleChange} delay={0.4} />
-              <FloatingField label="Carcaça" name="cr4a1_carcaca" value={form.cr4a1_carcaca} onChange={handleChange} delay={0.45} />
-              <FloatingField label="Potência (CV)" name="cr4a1_potencia_cv" value={form.cr4a1_potencia_cv} onChange={handleChange} delay={0.5} />
-              <FloatingField label="Potência (kW)" name="cr4a1_potencia_kw" value={form.cr4a1_potencia_kw} onChange={handleChange} delay={0.55} />
-              <FloatingField label="Tag Cliente" name="cr4a1_tag_cliente" value={form.cr4a1_tag_cliente} onChange={handleChange} delay={0.6} />
-              <FloatingField label="RPM" name="cr4a1_rpm" value={form.cr4a1_rpm} onChange={handleChange} delay={0.65} />
-              <FloatingField label="Polos" name="cr4a1_polos" value={form.cr4a1_polos} onChange={handleChange} delay={0.7} />
-              <FloatingField label="Classe" name="cr4a1_classe" value={form.cr4a1_classe} onChange={handleChange} delay={0.75} />
-              <FloatingField label="FS" name="cr4a1_fs" value={form.cr4a1_fs} onChange={handleChange} delay={0.8} />
-              <FloatingField label="IP" name="cr4a1_ip" value={form.cr4a1_ip} onChange={handleChange} delay={0.85} />
-              <FloatingField label="CAT" name="cr4a1_cat" value={form.cr4a1_cat} onChange={handleChange} delay={0.9} />
-              <FloatingField label="REG" name="cr4a1_reg" value={form.cr4a1_reg} onChange={handleChange} delay={0.95} />
-              <FloatingField label="FC" name="cr4a1_fc" value={form.cr4a1_fc} onChange={handleChange} delay={1.0} />
-              <FloatingField label="Frequência" name="cr4a1_frequencia" value={form.cr4a1_frequencia} onChange={handleChange} delay={1.05} />
-              <FloatingField label="Peso" name="cr4a1_peso" value={form.cr4a1_peso} onChange={handleChange} delay={1.1} />
-              <FloatingField label="Nº REQ" name="cr4a1_n_req" value={form.cr4a1_n_req} onChange={handleChange} delay={1.15} />
-              <FloatingField label="Tag Kairós" name="cr4a1_tag_kairos" value={form.cr4a1_tag_kairos} onChange={handleChange} delay={1.2} />
-              <FloatingField label="Comprimento" name="cr4a1_comprimento" value={form.cr4a1_comprimento} onChange={handleChange} delay={1.25} />
-              <FloatingField label="Largura" name="cr4a1_largura" value={form.cr4a1_largura} onChange={handleChange} delay={1.3} />
-              <FloatingField label="Altura" name="cr4a1_altura" value={form.cr4a1_altura} onChange={handleChange} delay={1.35} />
-              <FloatingField label="ME" name="cr4a1_me" value={form.cr4a1_me} onChange={handleChange} delay={1.4} />
+              <FloatingField label="Tensão *" name="cr4a1_tensao" value={form.cr4a1_tensao} onChange={handleChange} delay={0.25} required />
+              <FloatingField label="Corrente *" name="cr4a1_corrente" value={form.cr4a1_corrente} onChange={handleChange} delay={0.3} required />
+              <FloatingField label="Modelo *" name="cr4a1_modelo" value={form.cr4a1_modelo} onChange={handleChange} delay={0.35} required />
+              <FloatingField label="Fabricante *" name="cr4a1_fabricante" value={form.cr4a1_fabricante} onChange={handleChange} delay={0.4} required />
+              <FloatingField label="Carcaça *" name="cr4a1_carcaca" value={form.cr4a1_carcaca} onChange={handleChange} delay={0.45} required />
+              <FloatingField label="Potência (CV) *" name="cr4a1_potencia_cv" value={form.cr4a1_potencia_cv} onChange={handleChange} delay={0.5} required />
+              <FloatingField label="Potência (kW) *" name="cr4a1_potencia_kw" value={form.cr4a1_potencia_kw} onChange={handleChange} delay={0.55} required />
+              <FloatingField label="Tag Cliente *" name="cr4a1_tag_cliente" value={form.cr4a1_tag_cliente} onChange={handleChange} delay={0.6} required />
+              <FloatingField label="RPM *" name="cr4a1_rpm" value={form.cr4a1_rpm} onChange={handleChange} delay={0.65} required />
+              <FloatingField label="Polos *" name="cr4a1_polos" value={form.cr4a1_polos} onChange={handleChange} delay={0.7} required />
+              <FloatingField label="Classe *" name="cr4a1_classe" value={form.cr4a1_classe} onChange={handleChange} delay={0.75} required />
+              <FloatingField label="FS *" name="cr4a1_fs" value={form.cr4a1_fs} onChange={handleChange} delay={0.8} required />
+              <FloatingField label="IP *" name="cr4a1_ip" value={form.cr4a1_ip} onChange={handleChange} delay={0.85} required />
+              <FloatingField label="CAT *" name="cr4a1_cat" value={form.cr4a1_cat} onChange={handleChange} delay={0.9} required />
+              <FloatingField label="REG *" name="cr4a1_reg" value={form.cr4a1_reg} onChange={handleChange} delay={0.95} required />
+              <FloatingField label="FC *" name="cr4a1_fc" value={form.cr4a1_fc} onChange={handleChange} delay={1.0} required />
+              <FloatingField label="Frequência *" name="cr4a1_frequencia" value={form.cr4a1_frequencia} onChange={handleChange} delay={1.05} required />
+              <FloatingField label="Peso *" name="cr4a1_peso" value={form.cr4a1_peso} onChange={handleChange} delay={1.1} required />
+              <FloatingField label="Nº REQ *" name="cr4a1_n_req" value={form.cr4a1_n_req} onChange={handleChange} delay={1.15} required />
+              <FloatingField label="Tag Kairós *" name="cr4a1_tag_kairos" value={form.cr4a1_tag_kairos} onChange={handleChange} delay={1.2} required />
+              <FloatingField label="Comprimento *" name="cr4a1_comprimento" value={form.cr4a1_comprimento} onChange={handleChange} delay={1.25} required />
+              <FloatingField label="Largura *" name="cr4a1_largura" value={form.cr4a1_largura} onChange={handleChange} delay={1.3} required />
+              <FloatingField label="Altura *" name="cr4a1_altura" value={form.cr4a1_altura} onChange={handleChange} delay={1.35} required />
+              <FloatingField label="ME *" name="cr4a1_me" value={form.cr4a1_me} onChange={handleChange} delay={1.4} required />
             </div>
           </ElevatedCard>
         </motion.div>
@@ -382,21 +400,23 @@ export default function Cabecalho() {
             <ReadOnlyField label="Peritador" value={nomePeritador} delay={1.45} />
             {modoOffline ? (
               <FloatingField
-                label="Mecânico"
+                label="Mecânico *"
                 name="cr4a1_mecanico"
                 value={form.cr4a1_mecanico}
                 onChange={handleChange}
                 placeholder="Nome do mecânico"
                 delay={1.5}
+                required
               />
             ) : (
               <AnimatedSelect
-                label="Mecânico"
+                label="Mecânico *"
                 name="cr4a1_mecanico"
                 value={form.cr4a1_mecanico}
                 onChange={handleChange}
                 options={mecanicosOptions}
                 delay={1.5}
+                required
               />
             )}
           </ElevatedCard>
@@ -409,8 +429,8 @@ export default function Cabecalho() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.6, duration: 0.3 }}
         >
-          <FilledButton type="submit" style={{ width: '100%', marginTop: 8 }}>
-            Salvar e Iniciar Checklist
+          <FilledButton type="submit" disabled={!formCompleto} style={{ width: '100%', marginTop: 8 }}>
+            {formCompleto ? 'Salvar e Iniciar Checklist' : 'Preencha todos os campos'}
           </FilledButton>
         </motion.div>
       </form>
