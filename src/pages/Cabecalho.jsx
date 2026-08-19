@@ -285,13 +285,24 @@ export default function Cabecalho() {
     }
   }, [username, modoOffline]);
 
+  // Copia apenas os campos que o formulário conhece — o registro do Dataverse
+  // também traz metadados de sistema (ex.: _modifiedonbehalfby_value) que não
+  // podem ser reenviados no PATCH sem quebrar a gravação.
+  const mesclarCamposConhecidos = (prev, origem) => {
+    const atualizado = { ...prev };
+    Object.keys(prev).forEach(campo => {
+      if (origem[campo] !== undefined && origem[campo] !== null) atualizado[campo] = origem[campo];
+    });
+    return atualizado;
+  };
+
   // Se já existe cabeçalho para essa OS, carrega os dados para edição
   useEffect(() => {
     if (!os) return;
     if (modoOffline) {
       obterInspecaoPorOS(os).then(inspecao => {
         if (inspecao?.cabecalho && Object.keys(inspecao.cabecalho).length > 0) {
-          setForm(prev => ({ ...prev, ...inspecao.cabecalho }));
+          setForm(prev => mesclarCamposConhecidos(prev, inspecao.cabecalho));
         }
       }).catch(console.warn);
       return;
@@ -299,7 +310,7 @@ export default function Cabecalho() {
     getCabecalhoByOS(os).then(cab => {
       if (cab) {
         setCabecalhoExistenteId(cab.cr4a1_peritagem_cabecalhoid);
-        setForm(prev => ({ ...prev, ...cab }));
+        setForm(prev => mesclarCamposConhecidos(prev, cab));
       }
     }).catch(console.warn);
   }, [os, modoOffline]);
