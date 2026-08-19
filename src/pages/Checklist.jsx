@@ -15,6 +15,7 @@ import { useFirstTimeTips } from '../hooks/useFirstTimeTips';
 import { useModeloOffline } from '../hooks/useModeloOffline';
 import { salvarInspecaoOffline, obterInspecaoPorOS } from '../db/offlineStore';
 import { cabecalhoCompleto } from '../utils/cabecalho';
+import { comprimirImagem } from '../utils/imagem';
 
 function formatDistanceToNow(date) {
   const minutes = Math.round((Date.now() - date.getTime()) / 60000);
@@ -478,8 +479,6 @@ export default function Checklist() {
   return (
     <div
       style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
     >
       {showTips && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 2000, pointerEvents: 'none' }}>
@@ -663,7 +662,7 @@ export default function Checklist() {
         </div>
       </div>
 
-      <div className="page-content" ref={listaItensRef}>
+      <div className="page-content" ref={listaItensRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <AnimatePresence mode="wait">
           <motion.div
             key={tipoSelecionado}
@@ -793,9 +792,8 @@ export default function Checklist() {
         onChange={async (e) => {
           const file = e.target.files[0];
           if (!file || !fotoTempItemId) return;
-          const reader = new FileReader();
-          reader.onloadend = async () => {
-            const base64 = reader.result;
+          try {
+            const base64 = await comprimirImagem(file);
             const guid = crypto.randomUUID().slice(0, 6);
             const nomeArquivo = `${fotoTempItemId}_temp_${guid}.jpg`;
 
@@ -853,8 +851,11 @@ export default function Checklist() {
               setFotoTempItemId(null);
               e.target.value = '';
             }
-          };
-          reader.readAsDataURL(file);
+          } catch (err) {
+            error('Erro ao processar a foto.');
+            setFotoTempItemId(null);
+            e.target.value = '';
+          }
         }}
       />
     </div>

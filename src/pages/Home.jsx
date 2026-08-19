@@ -48,6 +48,7 @@ export default function Home() {
 
   const longPressTimer = useRef(null);
   const isLongPress = useRef(false);
+  const touchOrigin = useRef({ x: 0, y: 0, arrastou: false });
 
   // Ref para armazenar a função fetchData (estável)
   const fetchDataRef = useRef();
@@ -162,17 +163,34 @@ export default function Home() {
   };
 
   // Handlers de toque longo (mantidos)
-  const handlePressStart = useCallback((os) => {
+  const handlePressStart = useCallback((os, e) => {
     isLongPress.current = false;
+    const touch = e?.touches?.[0];
+    touchOrigin.current = { x: touch?.clientX ?? 0, y: touch?.clientY ?? 0, arrastou: false };
     longPressTimer.current = setTimeout(() => {
       isLongPress.current = true;
       setModalOS(os);
     }, 600);
   }, []);
 
+  // Cancela o toque (e o long-press) assim que o dedo se move o suficiente para
+  // ser uma rolagem, evitando que arrastar a tela seja interpretado como clique
+  const handlePressMove = useCallback((e) => {
+    const touch = e.touches?.[0];
+    if (!touch) return;
+    const dx = Math.abs(touch.clientX - touchOrigin.current.x);
+    const dy = Math.abs(touch.clientY - touchOrigin.current.y);
+    if (dx > 10 || dy > 10) {
+      touchOrigin.current.arrastou = true;
+      clearTimeout(longPressTimer.current);
+    }
+  }, []);
+
   const handlePressEnd = useCallback((os, e) => {
     clearTimeout(longPressTimer.current);
-    if (!isLongPress.current) {
+    const foiArrasto = touchOrigin.current.arrastou;
+    touchOrigin.current.arrastou = false;
+    if (!isLongPress.current && !foiArrasto) {
       e?.preventDefault();
       navigate(`/inspecao/${encodeURIComponent(os)}`);
     }
@@ -334,7 +352,8 @@ export default function Home() {
                   }}
                   whileHover={{ scale: 1.02, y: -2, boxShadow: 'var(--md-sys-elevation-3)' }}
                   whileTap={{ scale: 0.98, boxShadow: 'var(--md-sys-elevation-2)' }}
-                  onTouchStartCapture={() => handlePressStart(card.os)}
+                  onTouchStartCapture={(e) => handlePressStart(card.os, e)}
+                  onTouchMove={handlePressMove}
                   onTouchEndCapture={(e) => handlePressEnd(card.os, e)}
                   onMouseDownCapture={() => handleMouseDown(card.os)}
                   onMouseUpCapture={(e) => handleMouseUp(card.os, e)}
