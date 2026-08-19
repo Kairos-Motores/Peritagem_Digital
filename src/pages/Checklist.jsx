@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton } from '../components/ui/MdButton';
 import TopBar from '../components/navigation/TopBar';
 import ModeloItem from '../components/forms/ModeloItem';
+import CameraCapture from '../components/forms/CameraCapture';
 import { useDataverse } from '../hooks/useDataverse';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import { useToast } from '../hooks/useToast';
@@ -15,7 +16,6 @@ import { useFirstTimeTips } from '../hooks/useFirstTimeTips';
 import { useModeloOffline } from '../hooks/useModeloOffline';
 import { salvarInspecaoOffline, obterInspecaoPorOS } from '../db/offlineStore';
 import { cabecalhoCompleto } from '../utils/cabecalho';
-import { comprimirImagem } from '../utils/imagem';
 
 function formatDistanceToNow(date) {
   const minutes = Math.round((Date.now() - date.getTime()) / 60000);
@@ -54,7 +54,6 @@ export default function Checklist() {
   const [filtroStatus, setFiltroStatus] = useState('todos');
 
   const [fotoTempItemId, setFotoTempItemId] = useState(null);
-  const fotoTempInputRef = useRef(null);
   const listaItensRef = useRef(null);
   const touchStart = useRef({ x: 0, y: 0 });
 
@@ -422,7 +421,67 @@ export default function Checklist() {
 
   const handleTirarFotoItem = (itemId) => {
     setFotoTempItemId(itemId);
-    fotoTempInputRef.current?.click();
+  };
+
+  const salvarFotoCapturada = async (base64) => {
+    if (!fotoTempItemId) return;
+    const itemId = fotoTempItemId;
+    try {
+      const guid = crypto.randomUUID().slice(0, 6);
+      const nomeArquivo = `${itemId}_temp_${guid}.jpg`;
+
+      const novaFoto = {
+        id: guid,
+        itemId,
+        thumbnail: base64,      // mantido para miniaturas
+        nome: nomeArquivo,
+        url: base64,            // campo que AlbumFotos espera
+        name: nomeArquivo,      // campo que AlbumFotos espera
+        base64,                 // compatibilidade
+        nomeArquivo,
+      };
+
+      // Atualiza estado local de fotos (miniatura)
+      setFotos(prev => {
+        const novasFotos = [...(prev[itemId] || []), novaFoto];
+        return { ...prev, [itemId]: novasFotos };
+      });
+
+      if (modoOffline) {
+        const existente = await obterInspecaoPorOS(os);
+        const fotosSalvas = [...(existente?.fotos || []), {
+          id: guid,
+          itemId,
+          url: base64,
+          name: nomeArquivo,
+          base64,
+          nomeArquivo,
+        }];
+        await salvarInspecaoOffline({
+          ...(existente || {}),
+          os,
+          cabecalho: existente?.cabecalho || {},
+          respostas: existente?.respostas || {},
+          fotos: fotosSalvas,
+        });
+        success('Foto armazenada offline!');
+      } else {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-foto`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userToken}` },
+          body: JSON.stringify({
+            os, filial: inspecaoAtual?.filial || '', cliente: inspecaoAtual?.cliente || '',
+            fotoBase64: base64, nomeArquivo,
+          }),
+        });
+        if (!res.ok) throw new Error('Falha no upload');
+        success('Foto adicionada ao item!');
+      }
+    } catch (err) {
+      error('Erro ao enviar foto.');
+    } finally {
+      setFotoTempItemId(null);
+    }
   };
 
   const handleItemComplete = (itemId) => { vibrate(); };
@@ -782,81 +841,10 @@ export default function Checklist() {
         </div>
       )}
 
-      {/* Input oculto para foto (upload) */}
-      <input
-        type="file"
-        accept="image/*"
-        capture="environment"
-        ref={fotoTempInputRef}
-        style={{ display: 'none' }}
-        onChange={async (e) => {
-          const file = e.target.files[0];
-          if (!file || !fotoTempItemId) return;
-          try {
-            const base64 = await comprimirImagem(file);
-            const guid = crypto.randomUUID().slice(0, 6);
-            const nomeArquivo = `${fotoTempItemId}_temp_${guid}.jpg`;
-
-            const novaFoto = {
-              id: guid,
-              itemId: fotoTempItemId,
-              thumbnail: base64,      // mantido para miniaturas
-              nome: nomeArquivo,
-              url: base64,            // campo que AlbumFotos espera
-              name: nomeArquivo,      // campo que AlbumFotos espera
-              base64,                 // compatibilidade
-              nomeArquivo,
-            };
-
-            // Atualiza estado local de fotos (miniatura)
-            setFotos(prev => {
-              const novasFotos = [...(prev[fotoTempItemId] || []), novaFoto];
-              return { ...prev, [fotoTempItemId]: novasFotos };
-            });
-
-            try {
-              if (modoOffline) {
-                const existente = await obterInspecaoPorOS(os);
-                const fotosSalvas = [...(existente?.fotos || []), {
-                  id: guid,
-                  itemId: fotoTempItemId,
-                  url: base64,
-                  name: nomeArquivo,
-                  base64,
-                  nomeArquivo,
-                }];
-                await salvarInspecaoOffline({
-                  ...(existente || {}),
-                  os,
-                  cabecalho: existente?.cabecalho || {},
-                  respostas: existente?.respostas || {},
-                  fotos: fotosSalvas,
-                });
-                success('Foto armazenada offline!');
-              } else {
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-foto`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userToken}` },
-                  body: JSON.stringify({
-                    os, filial: inspecaoAtual?.filial || '', cliente: inspecaoAtual?.cliente || '',
-                    fotoBase64: base64, nomeArquivo,
-                  }),
-                });
-                if (!res.ok) throw new Error('Falha no upload');
-                success('Foto adicionada ao item!');
-              }
-            } catch (err) {
-              error('Erro ao enviar foto.');
-            } finally {
-              setFotoTempItemId(null);
-              e.target.value = '';
-            }
-          } catch (err) {
-            error('Erro ao processar a foto.');
-            setFotoTempItemId(null);
-            e.target.value = '';
-          }
-        }}
+      <CameraCapture
+        open={!!fotoTempItemId}
+        onClose={() => setFotoTempItemId(null)}
+        onCapture={salvarFotoCapturada}
       />
     </div>
   );
