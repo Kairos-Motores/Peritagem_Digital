@@ -114,6 +114,11 @@ export function useDataverse() {
     return search?.value?.[0]?.[idField];
   };
 
+  const updateCabecalho = async (cabecalhoId, dados) => {
+    const entitySet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
+    await callApi(`/${entitySet}(${cabecalhoId})`, 'PATCH', dados);
+  };
+
   const updateCabecalhoFinal = async (cabecalhoId) => {
     const entitySet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
     const payload = {
@@ -301,6 +306,7 @@ export function useDataverse() {
     getModeloItens,
     getInspecoes,
     createCabecalho,
+    updateCabecalho,
     updateCabecalhoFinal,
     getCabecalhoByOS,
     getItensByOS,

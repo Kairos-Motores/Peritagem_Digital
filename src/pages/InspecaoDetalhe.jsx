@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDataverse } from '../hooks/useDataverse';
 import { useInspecao } from '../contexts/InspecaoContext';
 import TopBar from '../components/navigation/TopBar';
-import { FilledButton } from '../components/ui/MdButton';
+import { FilledButton, OutlinedButton } from '../components/ui/MdButton';
 import { ElevatedCard } from '../components/ui/MdCard';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import { useToast } from '../hooks/useToast';
@@ -517,6 +517,13 @@ export default function InspecaoDetalhe() {
               </p>
             )}
 
+            <OutlinedButton
+              onClick={() => navigate(`/cabecalho?os=${encodeURIComponent(os)}&cliente=${encodeURIComponent(cabecalho?.cr4a1_cliente || '')}`)}
+              style={{ width: '100%', marginTop: 16 }}
+            >
+              Editar Cabeçalho
+            </OutlinedButton>
+
             {cabecalho.cr4a1_status === 'Em andamento' && (
               <FilledButton
                 onClick={() => {
@@ -524,7 +531,7 @@ export default function InspecaoDetalhe() {
                   retomarInspecao(os, cabecalhoId, cabecalho?.cr4a1_filial || '', cabecalho?.cr4a1_cliente || '');
                   navigate('/checklist');
                 }}
-                style={{ width: '100%', marginTop: 16 }}
+                style={{ width: '100%', marginTop: 8 }}
               >
                 Continuar Inspeção
               </FilledButton>

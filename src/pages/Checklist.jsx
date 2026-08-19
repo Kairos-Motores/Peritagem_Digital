@@ -14,6 +14,7 @@ import { useAudioFeedback } from '../hooks/useAudioFeedback';
 import { useFirstTimeTips } from '../hooks/useFirstTimeTips';
 import { useModeloOffline } from '../hooks/useModeloOffline';
 import { salvarInspecaoOffline, obterInspecaoPorOS } from '../db/offlineStore';
+import { cabecalhoCompleto } from '../utils/cabecalho';
 
 function formatDistanceToNow(date) {
   const minutes = Math.round((Date.now() - date.getTime()) / 60000);
@@ -26,7 +27,7 @@ export default function Checklist() {
   const { inspecaoAtual } = useInspecao();
   const navigate = useNavigate();
   const { success, error, info } = useToast();
-  const { salvarTipo, updateStatusCabecalho, getItensByOS } = useDataverse();
+  const { salvarTipo, updateStatusCabecalho, getItensByOS, getCabecalhoByOS } = useDataverse();
   const { modoOffline } = useOffline();
   const { playSuccess, playComplete, vibrate, playClick } = useAudioFeedback();
   const { show: showTips, markSeen } = useFirstTimeTips();
@@ -58,6 +59,32 @@ export default function Checklist() {
 
   const os = inspecaoAtual?.os;
   const userToken = sessionStorage.getItem('dv_token');
+  const [cabecalhoValidado, setCabecalhoValidado] = useState(false);
+
+  // Bloqueia o checklist enquanto o cabeçalho não estiver completo
+  // (fecha o atalho de "Continuar Inspeção" indo direto pro checklist)
+  useEffect(() => {
+    if (!os) return;
+    let ativo = true;
+    const bloquear = () => {
+      error('Complete o cabeçalho antes de iniciar o checklist.');
+      navigate(`/cabecalho?os=${encodeURIComponent(os)}&cliente=${encodeURIComponent(inspecaoAtual?.cliente || '')}`, { replace: true });
+    };
+    if (modoOffline) {
+      obterInspecaoPorOS(os).then(inspecao => {
+        if (!ativo) return;
+        if (!cabecalhoCompleto(inspecao?.cabecalho)) bloquear();
+        else setCabecalhoValidado(true);
+      }).catch(() => setCabecalhoValidado(true));
+    } else {
+      getCabecalhoByOS(os).then(cab => {
+        if (!ativo) return;
+        if (!cabecalhoCompleto(cab)) bloquear();
+        else setCabecalhoValidado(true);
+      }).catch(() => setCabecalhoValidado(true));
+    }
+    return () => { ativo = false; };
+  }, [os, modoOffline]);
 
   // Aviso ao fechar a aba/janela
   useEffect(() => {
@@ -432,6 +459,7 @@ export default function Checklist() {
     ) : null;
 
   if (!inspecaoAtual) return <p>Inspeção não encontrada.</p>;
+  if (!cabecalhoValidado) return <LoadingScreen message="Verificando cabeçalho" />;
   if (!modoOffline && modeloLoading) return <LoadingScreen message="Preparando checklist" />;
   if (modoOffline && itensModelo.length === 0) {
     return (

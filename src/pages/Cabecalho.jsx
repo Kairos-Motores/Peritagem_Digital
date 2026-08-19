@@ -8,8 +8,9 @@ import Logo from "../assets/Medro llogo horizontal-Medro.svg";
 import TopBar from '../components/navigation/TopBar';
 import { ElevatedCard } from '../components/ui/MdCard';
 import { useOffline } from '../contexts/OfflineContext';
-import { salvarInspecaoOffline } from '../db/offlineStore';
+import { salvarInspecaoOffline, obterInspecaoPorOS } from '../db/offlineStore';
 import { motion } from 'framer-motion';
+import { cabecalhoCompleto } from '../utils/cabecalho';
 
 // ============================================
 // Componente de campo flutuante com animações
@@ -209,7 +210,7 @@ export default function Cabecalho() {
   const clienteInicial = searchParams.get('cliente') || '';
   const { inspecaoAtual, novaInspecao, setCabecalhoId } = useInspecao();
   const navigate = useNavigate();
-  const { createCabecalho, getUsuarios, getUsuarioLogado, getFilialPeritador } = useDataverse();
+  const { createCabecalho, updateCabecalho, getCabecalhoByOS, getUsuarios, getUsuarioLogado, getFilialPeritador } = useDataverse();
   const { success, error } = useToast();
   const { modoOffline } = useOffline();
 
@@ -217,6 +218,7 @@ export default function Cabecalho() {
   const [mecanicos, setMecanicos] = useState([]);
   const [nomePeritador, setNomePeritador] = useState(username || '');
   const [filial, setFilial] = useState('');
+  const [cabecalhoExistenteId, setCabecalhoExistenteId] = useState(null);
 
   const [form, setForm] = useState({
     cr4a1_os: os,
@@ -283,21 +285,32 @@ export default function Cabecalho() {
     }
   }, [username, modoOffline]);
 
+  // Se já existe cabeçalho para essa OS, carrega os dados para edição
+  useEffect(() => {
+    if (!os) return;
+    if (modoOffline) {
+      obterInspecaoPorOS(os).then(inspecao => {
+        if (inspecao?.cabecalho && Object.keys(inspecao.cabecalho).length > 0) {
+          setForm(prev => ({ ...prev, ...inspecao.cabecalho }));
+        }
+      }).catch(console.warn);
+      return;
+    }
+    getCabecalhoByOS(os).then(cab => {
+      if (cab) {
+        setCabecalhoExistenteId(cab.cr4a1_peritagem_cabecalhoid);
+        setForm(prev => ({ ...prev, ...cab }));
+      }
+    }).catch(console.warn);
+  }, [os, modoOffline]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
   // Campos que o peritador precisa preencher para liberar o checklist
-  const camposObrigatorios = [
-    'cr4a1_area', 'cr4a1_n_serie', 'cr4a1_os_retorno',
-    'cr4a1_tensao', 'cr4a1_corrente', 'cr4a1_modelo', 'cr4a1_fabricante', 'cr4a1_carcaca',
-    'cr4a1_potencia_cv', 'cr4a1_potencia_kw', 'cr4a1_tag_cliente', 'cr4a1_rpm', 'cr4a1_polos',
-    'cr4a1_classe', 'cr4a1_fs', 'cr4a1_ip', 'cr4a1_cat', 'cr4a1_reg', 'cr4a1_fc', 'cr4a1_frequencia',
-    'cr4a1_peso', 'cr4a1_n_req', 'cr4a1_tag_kairos', 'cr4a1_comprimento', 'cr4a1_largura', 'cr4a1_altura',
-    'cr4a1_me', 'cr4a1_mecanico',
-  ];
-  const formCompleto = camposObrigatorios.every(campo => form[campo]?.toString().trim().length > 0);
+  const formCompleto = cabecalhoCompleto(form);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -315,9 +328,20 @@ export default function Cabecalho() {
     }
     try {
       if (modoOffline) {
-        await salvarInspecaoOffline({ os, cabecalho: form, respostas: {}, fotos: [] });
-        setCabecalhoId(null);
+        const existente = await obterInspecaoPorOS(os);
+        await salvarInspecaoOffline({
+          ...(existente || {}),
+          os,
+          cabecalho: form,
+          respostas: existente?.respostas || {},
+          fotos: existente?.fotos || [],
+        });
+        setCabecalhoId(cabecalhoExistenteId);
         success('Cabeçalho salvo offline!');
+      } else if (cabecalhoExistenteId) {
+        await updateCabecalho(cabecalhoExistenteId, form);
+        setCabecalhoId(cabecalhoExistenteId);
+        success('Cabeçalho atualizado!');
       } else {
         const cabecalhoId = await createCabecalho(form);
         setCabecalhoId(cabecalhoId);
@@ -336,7 +360,7 @@ export default function Cabecalho() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
-      <TopBar title="Cabeçalho" logoSrc={Logo} />
+      <TopBar title={cabecalhoExistenteId ? 'Editar Cabeçalho' : 'Cabeçalho'} logoSrc={Logo} />
       <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         {modoOffline && (
           <motion.p
