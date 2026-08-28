@@ -3,6 +3,7 @@ import { useInspecao } from '../contexts/InspecaoContext';
 import { useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton } from '../components/ui/MdButton';
 import TopBar from '../components/navigation/TopBar';
+import AbaPeritagens from '../components/navigation/AbaPeritagens';
 import ModeloItem from '../components/forms/ModeloItem';
 import CameraCapture from '../components/forms/CameraCapture';
 import { useDataverse } from '../hooks/useDataverse';
@@ -559,6 +560,7 @@ export default function Checklist() {
       )}
 
       <TopBar title={`OS: ${os}`} logoSrc={Logo} onBack={handleBack} />
+      <AbaPeritagens salvarAntesDeTrocar={() => salvarAtual(tipoSelecionado)} />
       {modoOffline && (
         <div style={{ padding: '8px 16px', backgroundColor: 'var(--md-sys-color-error-container)', color: 'var(--md-sys-color-on-error-container)', fontSize: '0.8rem' }}>
           Modo offline – as alterações serão sincronizadas quando houver conexão.

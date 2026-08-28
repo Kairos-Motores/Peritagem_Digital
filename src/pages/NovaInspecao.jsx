@@ -6,6 +6,8 @@ import { FilledButton } from '../components/ui/MdButton';
 import { useDataverse } from '../hooks/useDataverse';
 import { useOffline } from '../contexts/OfflineContext';
 import FloatingNav from '../components/navigation/FloatingNav';
+import { useToast } from '../hooks/useToast';
+import { MAX_PERITAGENS_ABERTAS } from '../contexts/InspecaoContext';
 
 export default function NovaInspecao() {
   const [searchParams] = useSearchParams();
@@ -19,6 +21,7 @@ export default function NovaInspecao() {
 
   const { novaInspecao } = useInspecao();
   const navigate = useNavigate();
+  const { error: toastError } = useToast();
   const { validarOS } = useDataverse();
   const { modoOffline, salvarLocal } = useOffline();
   const debounceRef = useRef(null);
@@ -80,7 +83,11 @@ export default function NovaInspecao() {
 
   const iniciar = async () => {
     if (!podeProsseguir) return;
-    novaInspecao(osTrim);
+    const abriu = novaInspecao(osTrim);
+    if (!abriu) {
+      toastError(`Você já tem ${MAX_PERITAGENS_ABERTAS} peritagens abertas. Feche uma antes de iniciar outra.`);
+      return;
+    }
     if (modoOffline) {
       await salvarLocal({ os: osTrim, cabecalho: null, respostas: {}, fotos: [], status: 'rascunho' });
       navigate(`/cabecalho?os=${encodeURIComponent(osTrim)}`);

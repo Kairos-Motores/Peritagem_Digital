@@ -6,6 +6,7 @@ import { FilledButton } from '../components/ui/MdButton';
 import { useToast } from '../hooks/useToast';
 import Logo from "../assets/Medro llogo horizontal-Medro.svg";
 import TopBar from '../components/navigation/TopBar';
+import AbaPeritagens from '../components/navigation/AbaPeritagens';
 import { ElevatedCard } from '../components/ui/MdCard';
 import { useOffline } from '../contexts/OfflineContext';
 import { salvarInspecaoOffline, obterInspecaoPorOS } from '../db/offlineStore';
@@ -372,6 +373,7 @@ export default function Cabecalho() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
       <TopBar title={cabecalhoExistenteId ? 'Editar Cabeçalho' : 'Cabeçalho'} logoSrc={Logo} />
+      <AbaPeritagens />
       <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         {modoOffline && (
           <motion.p

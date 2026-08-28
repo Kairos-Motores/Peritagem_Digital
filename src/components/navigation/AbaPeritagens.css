@@ -1,0 +1,33 @@
+.aba-peritagens-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  scrollbar-width: none;
+}
+.aba-peritagens-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.aba-fechar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background-color 0.15s;
+}
+.aba-fechar-btn.ativa:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+.aba-fechar-btn.inativa:hover {
+  background-color: var(--md-sys-color-surface-variant);
+}
+
+.aba-os-input:focus {
+  border-color: var(--md-sys-color-primary) !important;
+}

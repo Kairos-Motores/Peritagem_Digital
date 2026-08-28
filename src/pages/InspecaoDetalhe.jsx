@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDataverse } from '../hooks/useDataverse';
-import { useInspecao } from '../contexts/InspecaoContext';
+import { useInspecao, MAX_PERITAGENS_ABERTAS } from '../contexts/InspecaoContext';
 import TopBar from '../components/navigation/TopBar';
 import { FilledButton, OutlinedButton } from '../components/ui/MdButton';
 import { ElevatedCard } from '../components/ui/MdCard';
@@ -528,7 +528,11 @@ export default function InspecaoDetalhe() {
               <FilledButton
                 onClick={() => {
                   const cabecalhoId = cabecalho.cr4a1_peritagem_cabecalhoid;
-                  retomarInspecao(os, cabecalhoId, cabecalho?.cr4a1_filial || '', cabecalho?.cr4a1_cliente || '');
+                  const abriu = retomarInspecao(os, cabecalhoId, cabecalho?.cr4a1_filial || '', cabecalho?.cr4a1_cliente || '');
+                  if (!abriu) {
+                    toastError(`Você já tem ${MAX_PERITAGENS_ABERTAS} peritagens abertas. Feche uma antes de continuar outra.`);
+                    return;
+                  }
                   navigate('/checklist');
                 }}
                 style={{ width: '100%', marginTop: 8 }}
