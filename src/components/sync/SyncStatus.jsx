@@ -2,15 +2,20 @@ import { useContext } from 'react';
 import { SyncContext } from '../../contexts/SyncContext';
 
 export default function SyncStatus() {
-  const { pendentes, sincronizar, isOnline } = useContext(SyncContext);
+  const { pendentes, comErro, sincronizar, isOnline } = useContext(SyncContext);
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
-      <span className="material-symbols-outlined" style={{ color: isOnline ? 'green' : 'gray' }}>
-        {isOnline ? 'wifi' : 'wifi_off'}
+      <span className="material-symbols-outlined" style={{ color: comErro > 0 ? 'var(--md-sys-color-error)' : isOnline ? 'green' : 'gray' }}>
+        {comErro > 0 ? 'sync_problem' : isOnline ? 'wifi' : 'wifi_off'}
       </span>
       {pendentes > 0 ? (
-        <span>{pendentes} inspeção{pendentes !== 1 ? 'ões' : ''} pendente{pendentes !== 1 ? 's' : ''}</span>
+        <span>
+          {pendentes} inspeção{pendentes !== 1 ? 'ões' : ''} pendente{pendentes !== 1 ? 's' : ''}
+          {comErro > 0 && (
+            <span style={{ color: 'var(--md-sys-color-error)' }}> ({comErro} com erro, tentando de novo)</span>
+          )}
+        </span>
       ) : (
         <span>Tudo sincronizado</span>
       )}
