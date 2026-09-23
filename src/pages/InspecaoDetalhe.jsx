@@ -120,9 +120,6 @@ function ItemCard({ item, index, onViewObservacao }) {
     ? refPairs.filter(p => p.quantidade > 0)
     : refPairs;
 
-  const isMultQuant = tipolinha.includes('Mult');
-  const isMultRef = tiporeferencia.includes('Mult');
-
   return (
     <motion.div
       layout
@@ -193,27 +190,19 @@ function ItemCard({ item, index, onViewObservacao }) {
                 );
               }
 
-              if (isMultQuant) {
-                let style = { ...baseStyle };
-                if (cor && valor > 0) {
-                  style.backgroundColor = cor;
-                  style.color = '#fff';
-                } else if (valor > 0) {
-                  style.backgroundColor = 'var(--md-sys-color-primary-container)';
-                  style.color = 'var(--md-sys-color-on-primary-container)';
-                } else {
-                  style.backgroundColor = 'var(--md-sys-color-surface-variant)';
-                  style.color = 'var(--md-sys-color-on-surface-variant)';
-                  style.opacity = 0.4;
-                }
-                return <span key={idx} style={style}>{opcao}: {valor}</span>;
+              let style = { ...baseStyle };
+              if (cor && valor > 0) {
+                style.backgroundColor = cor;
+                style.color = '#fff';
+              } else if (valor > 0) {
+                style.backgroundColor = 'var(--md-sys-color-primary-container)';
+                style.color = 'var(--md-sys-color-on-primary-container)';
+              } else {
+                style.backgroundColor = 'var(--md-sys-color-surface-variant)';
+                style.color = 'var(--md-sys-color-on-surface-variant)';
+                style.opacity = 0.4;
               }
-
-              return (
-                <span key={idx} style={{ ...baseStyle, backgroundColor: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}>
-                  {opcao}: {valor}
-                </span>
-              );
+              return <span key={idx} style={style}>{opcao}: {valor}</span>;
             })}
           </div>
         )}
@@ -252,27 +241,19 @@ function ItemCard({ item, index, onViewObservacao }) {
                   );
                 }
 
-                if (isMultRef) {
-                  let style = { ...baseStyle };
-                  if (cor && valor > 0) {
-                    style.backgroundColor = cor;
-                    style.color = '#fff';
-                  } else if (valor > 0) {
-                    style.backgroundColor = 'var(--md-sys-color-tertiary-container)';
-                    style.color = 'var(--md-sys-color-on-tertiary-container)';
-                  } else {
-                    style.backgroundColor = 'var(--md-sys-color-surface-variant)';
-                    style.color = 'var(--md-sys-color-on-surface-variant)';
-                    style.opacity = 0.4;
-                  }
-                  return <span key={idx} style={style}>{opcao}: {valor}</span>;
+                let style = { ...baseStyle };
+                if (cor && valor > 0) {
+                  style.backgroundColor = cor;
+                  style.color = '#fff';
+                } else if (valor > 0) {
+                  style.backgroundColor = 'var(--md-sys-color-tertiary-container)';
+                  style.color = 'var(--md-sys-color-on-tertiary-container)';
+                } else {
+                  style.backgroundColor = 'var(--md-sys-color-surface-variant)';
+                  style.color = 'var(--md-sys-color-on-surface-variant)';
+                  style.opacity = 0.4;
                 }
-
-                return (
-                  <span key={idx} style={{ ...baseStyle, backgroundColor: 'var(--md-sys-color-tertiary-container)', color: 'var(--md-sys-color-on-tertiary-container)' }}>
-                    {opcao}: {valor}
-                  </span>
-                );
+                return <span key={idx} style={style}>{opcao}: {valor}</span>;
               })}
             </div>
           </div>
@@ -303,6 +284,18 @@ export default function InspecaoDetalhe() {
 
   const [termoBusca, setTermoBusca] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState(null);
+
+  // Colapsa a grade de dados do cabeçalho (2 dezenas de campos) em telas de
+  // celular/tablet, pra não obrigar a rolar tudo isso só pra chegar nas
+  // fotos e nos itens avaliados mais abaixo. Preferência persistida.
+  const [dadosColapsados, setDadosColapsados] = useState(() => localStorage.getItem('kairos_detalhe_dados_colapsados') === 'true');
+  const alternarDadosColapsados = () => {
+    setDadosColapsados(prev => {
+      const proximo = !prev;
+      localStorage.setItem('kairos_detalhe_dados_colapsados', String(proximo));
+      return proximo;
+    });
+  };
 
   const username = sessionStorage.getItem('dv_username');
   const userToken = sessionStorage.getItem('dv_token');
@@ -481,41 +474,69 @@ export default function InspecaoDetalhe() {
       <div className="page-content" style={{ paddingBottom: 24 }}>
         {cabecalho && (
           <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div
+              onClick={alternarDadosColapsados}
+              role="button"
+              tabIndex={0}
+              aria-expanded={!dadosColapsados}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternarDadosColapsados(); } }}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+            >
               <h2 style={{ margin: 0, color: 'var(--md-sys-color-on-surface)' }}>Dados da Peritagem</h2>
-              {cabecalho.cr4a1_status && (
-                <span style={{
-                  padding: '4px 14px',
-                  borderRadius: 20,
-                  backgroundColor: cabecalho.cr4a1_status === 'Concluída'
-                    ? 'var(--md-sys-color-primary)'
-                    : 'var(--md-sys-color-surface-variant)',
-                  color: cabecalho.cr4a1_status === 'Concluída' ? '#fff' : 'var(--md-sys-color-on-surface-variant)',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                }}>
-                  {cabecalho.cr4a1_status}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {cabecalho.cr4a1_status && (
+                  <span style={{
+                    padding: '4px 14px',
+                    borderRadius: 20,
+                    backgroundColor: cabecalho.cr4a1_status === 'Concluída'
+                      ? 'var(--md-sys-color-primary)'
+                      : 'var(--md-sys-color-surface-variant)',
+                    color: cabecalho.cr4a1_status === 'Concluída' ? '#fff' : 'var(--md-sys-color-on-surface-variant)',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                  }}>
+                    {cabecalho.cr4a1_status}
+                  </span>
+                )}
+                <span
+                  className="material-symbols-outlined"
+                  style={{ color: 'var(--md-sys-color-on-surface-variant)', transition: 'transform 0.2s', transform: dadosColapsados ? 'rotate(0deg)' : 'rotate(180deg)' }}
+                >
+                  expand_more
                 </span>
+              </div>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {!dadosColapsados && (
+                <motion.div
+                  key="dados-peritagem-colapsavel"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                    gap: 12,
+                    marginTop: 20,
+                  }}>
+                    {cabecalhoFields.map((field, i) => (
+                      <InfoCard key={field.label} label={field.label} value={field.value} delay={i * 0.02} />
+                    ))}
+                  </div>
+
+                  {cabecalho.cr4a1_data_peritagem && (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--md-sys-color-on-surface-variant)', marginTop: 8 }}>
+                      Início: {new Date(cabecalho.cr4a1_data_peritagem).toLocaleString()}
+                      {cabecalho.cr4a1_data_peritagem_fim && ` – Fim: ${new Date(cabecalho.cr4a1_data_peritagem_fim).toLocaleString()}`}
+                    </p>
+                  )}
+                </motion.div>
               )}
-            </div>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-              gap: 12,
-              marginBottom: 20,
-            }}>
-              {cabecalhoFields.map((field, i) => (
-                <InfoCard key={field.label} label={field.label} value={field.value} delay={i * 0.02} />
-              ))}
-            </div>
-
-            {cabecalho.cr4a1_data_peritagem && (
-              <p style={{ fontSize: '0.8rem', color: 'var(--md-sys-color-on-surface-variant)', marginTop: 8 }}>
-                Início: {new Date(cabecalho.cr4a1_data_peritagem).toLocaleString()}
-                {cabecalho.cr4a1_data_peritagem_fim && ` – Fim: ${new Date(cabecalho.cr4a1_data_peritagem_fim).toLocaleString()}`}
-              </p>
-            )}
+            </AnimatePresence>
 
             <OutlinedButton
               onClick={() => navigate(`/cabecalho?os=${encodeURIComponent(os)}&cliente=${encodeURIComponent(cabecalho?.cr4a1_cliente || '')}`)}

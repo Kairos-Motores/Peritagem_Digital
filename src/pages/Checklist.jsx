@@ -54,6 +54,19 @@ export default function Checklist() {
   const [termoBuscaItem, setTermoBuscaItem] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('todos');
 
+  // Colapsa tipos/progresso/busca em telas de celular e tablet, pra não
+  // obrigar a rolar a tela toda só pra ver os itens do checklist. Lembra a
+  // preferência entre sessões (é uma escolha de layout do peritador, não
+  // dado da peritagem).
+  const [headerColapsado, setHeaderColapsado] = useState(() => localStorage.getItem('kairos_checklist_header_colapsado') === 'true');
+  const alternarHeaderColapsado = () => {
+    setHeaderColapsado(prev => {
+      const proximo = !prev;
+      localStorage.setItem('kairos_checklist_header_colapsado', String(proximo));
+      return proximo;
+    });
+  };
+
   const [fotoTempItemId, setFotoTempItemId] = useState(null);
   const listaItensRef = useRef(null);
   const touchStart = useRef({ x: 0, y: 0 });
@@ -567,6 +580,48 @@ export default function Checklist() {
         </div>
       )}
 
+      {/* Barra-resumo + botão de colapsar tipos/progresso/busca */}
+      <button
+        type="button"
+        onClick={alternarHeaderColapsado}
+        aria-expanded={!headerColapsado}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
+          padding: '8px 16px', background: 'transparent', border: 'none', cursor: 'pointer',
+          borderBottom: headerColapsado ? '1px solid var(--md-sys-color-outline-variant)' : 'none',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', fontWeight: 600, color: 'var(--md-sys-color-on-surface)', minWidth: 0 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--md-sys-color-primary)' }}>category</span>
+          {tipoSelecionado ? (
+            <>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tipoSelecionado}</span>
+              <span style={{ color: 'var(--md-sys-color-on-surface-variant)', fontWeight: 400, flexShrink: 0 }}>
+                {progressoTipoAtual.completos}/{progressoTipoAtual.total}
+              </span>
+            </>
+          ) : (
+            <span style={{ color: 'var(--md-sys-color-on-surface-variant)', fontWeight: 400 }}>Tipos, progresso e busca</span>
+          )}
+        </span>
+        <span
+          className="material-symbols-outlined"
+          style={{ flexShrink: 0, transition: 'transform 0.2s', transform: headerColapsado ? 'rotate(0deg)' : 'rotate(180deg)' }}
+        >
+          expand_more
+        </span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {!headerColapsado && (
+          <motion.div
+            key="checklist-header-colapsavel"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            style={{ overflow: 'hidden' }}
+          >
       {/* Botões de tipo + Marcar todos OK */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
@@ -722,6 +777,9 @@ export default function Checklist() {
           ))}
         </div>
       </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="page-content" ref={listaItensRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <AnimatePresence mode="wait">
