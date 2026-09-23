@@ -114,6 +114,20 @@ export function useDataverse() {
     return search?.value?.[0]?.[idField];
   };
 
+  // Busca o cabeçalho mais recente com o mesmo modelo (e fabricante, se
+  // informado) pra preencher automaticamente os dados técnicos de um motor
+  // já peritado antes — usado pelo botão opcional "Buscar dados técnicos".
+  const getUltimoCabecalhoPorModelo = async (modelo, fabricante) => {
+    if (!modelo) return null;
+    const entitySet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
+    const escapar = (v) => v.replace(/'/g, "''");
+    const filtros = [`cr4a1_modelo eq '${encodeURIComponent(escapar(modelo))}'`];
+    if (fabricante) filtros.push(`cr4a1_fabricante eq '${encodeURIComponent(escapar(fabricante))}'`);
+    const query = `$filter=${filtros.join(' and ')}&$orderby=cr4a1_data_peritagem desc&$top=1`;
+    const data = await callApi(`/${entitySet}?${query}`);
+    return data?.value?.[0] || null;
+  };
+
   const updateCabecalho = async (cabecalhoId, dados) => {
     const entitySet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
     await callApi(`/${entitySet}(${cabecalhoId})`, 'PATCH', dados);
@@ -307,6 +321,7 @@ export function useDataverse() {
     getInspecoes,
     createCabecalho,
     updateCabecalho,
+    getUltimoCabecalhoPorModelo,
     updateCabecalhoFinal,
     getCabecalhoByOS,
     getItensByOS,

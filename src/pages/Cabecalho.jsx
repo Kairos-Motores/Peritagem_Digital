@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useInspecao } from '../contexts/InspecaoContext';
 import { useDataverse } from '../hooks/useDataverse';
-import { FilledButton } from '../components/ui/MdButton';
+import { FilledButton, OutlinedButton } from '../components/ui/MdButton';
 import { useToast } from '../hooks/useToast';
 import Logo from "../assets/Medro llogo horizontal-Medro.svg";
 import TopBar from '../components/navigation/TopBar';
@@ -10,8 +10,51 @@ import AbaPeritagens from '../components/navigation/AbaPeritagens';
 import { ElevatedCard } from '../components/ui/MdCard';
 import { useOffline } from '../contexts/OfflineContext';
 import { salvarInspecaoOffline, obterInspecaoPorOS } from '../db/offlineStore';
-import { motion } from 'framer-motion';
-import { cabecalhoCompleto } from '../utils/cabecalho';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cabecalhoCompleto, camposCompletos, CAMPOS_POR_STEP, CAMPOS_TECNICOS_MODELO } from '../utils/cabecalho';
+
+const STEPS = [
+  { id: 'identificacao', label: 'Identificação' },
+  { id: 'tecnico', label: 'Dados Técnicos' },
+  { id: 'equipe', label: 'Equipe' },
+];
+
+function StepHeader({ currentIndex, maxReached, onStepClick }) {
+  return (
+    <div style={{ display: 'flex', padding: '12px 16px 4px' }}>
+      {STEPS.map((step, i) => {
+        const atual = i === currentIndex;
+        const concluido = i < currentIndex;
+        const habilitado = i <= maxReached;
+        return (
+          <div
+            key={step.id}
+            onClick={() => habilitado && onStepClick(i)}
+            style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+              cursor: habilitado ? 'pointer' : 'default', opacity: habilitado ? 1 : 0.4,
+            }}
+          >
+            <div style={{
+              width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backgroundColor: atual ? 'var(--md-sys-color-primary)' : concluido ? 'var(--md-sys-color-primary-container)' : 'var(--md-sys-color-surface-variant)',
+              color: atual ? '#fff' : concluido ? 'var(--md-sys-color-on-primary-container)' : 'var(--md-sys-color-on-surface-variant)',
+              fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s',
+            }}>
+              {concluido ? <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check</span> : i + 1}
+            </div>
+            <span style={{
+              fontSize: '0.7rem', textAlign: 'center', fontWeight: atual ? 600 : 400,
+              color: atual ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-on-surface-variant)',
+            }}>
+              {step.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ============================================
 // Componente de campo flutuante com animações
@@ -211,8 +254,11 @@ export default function Cabecalho() {
   const clienteInicial = searchParams.get('cliente') || '';
   const { inspecaoAtual, novaInspecao, setCabecalhoId } = useInspecao();
   const navigate = useNavigate();
-  const { createCabecalho, updateCabecalho, getCabecalhoByOS, getUsuarios, getUsuarioLogado, getFilialPeritador } = useDataverse();
-  const { success, error } = useToast();
+  const {
+    createCabecalho, updateCabecalho, getCabecalhoByOS, getUsuarios, getUsuarioLogado,
+    getFilialPeritador, getUltimoCabecalhoPorModelo,
+  } = useDataverse();
+  const { success, error, info } = useToast();
   const { modoOffline } = useOffline();
 
   const username = sessionStorage.getItem('dv_username');
@@ -220,6 +266,10 @@ export default function Cabecalho() {
   const [nomePeritador, setNomePeritador] = useState(username || '');
   const [filial, setFilial] = useState('');
   const [cabecalhoExistenteId, setCabecalhoExistenteId] = useState(null);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [maxStepReached, setMaxStepReached] = useState(0);
+  const [buscandoDados, setBuscandoDados] = useState(false);
+  const formScrollRef = useRef(null);
 
   const [form, setForm] = useState({
     cr4a1_os: os,
@@ -304,6 +354,8 @@ export default function Cabecalho() {
       obterInspecaoPorOS(os).then(inspecao => {
         if (inspecao?.cabecalho && Object.keys(inspecao.cabecalho).length > 0) {
           setForm(prev => mesclarCamposConhecidos(prev, inspecao.cabecalho));
+          // Cabeçalho existente: libera navegação livre entre os passos
+          if (cabecalhoCompleto(inspecao.cabecalho)) setMaxStepReached(STEPS.length - 1);
         }
       }).catch(console.warn);
       return;
@@ -312,6 +364,7 @@ export default function Cabecalho() {
       if (cab) {
         setCabecalhoExistenteId(cab.cr4a1_peritagem_cabecalhoid);
         setForm(prev => mesclarCamposConhecidos(prev, cab));
+        if (cabecalhoCompleto(cab)) setMaxStepReached(STEPS.length - 1);
       }
     }).catch(console.warn);
   }, [os, modoOffline]);
@@ -323,6 +376,58 @@ export default function Cabecalho() {
 
   // Campos que o peritador precisa preencher para liberar o checklist
   const formCompleto = cabecalhoCompleto(form);
+  const stepAtualCompleto = camposCompletos(form, CAMPOS_POR_STEP[STEPS[stepIndex].id]);
+  const ultimoStep = stepIndex === STEPS.length - 1;
+
+  const irParaStep = (i) => {
+    setStepIndex(i);
+    formScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleProximo = () => {
+    if (!stepAtualCompleto) return;
+    const proximo = Math.min(stepIndex + 1, STEPS.length - 1);
+    setMaxStepReached(m => Math.max(m, proximo));
+    irParaStep(proximo);
+  };
+
+  const handleAnterior = () => irParaStep(Math.max(stepIndex - 1, 0));
+
+  // Busca opcional: procura o cabeçalho mais recente com o mesmo modelo
+  // (e fabricante, se já preenchido) e completa os campos técnicos que
+  // ainda estiverem vazios — nunca sobrescreve o que o peritador já digitou.
+  const buscarDadosAutomaticos = async () => {
+    if (!form.cr4a1_modelo?.trim()) {
+      error('Informe o modelo antes de buscar.');
+      return;
+    }
+    setBuscandoDados(true);
+    try {
+      const anterior = await getUltimoCabecalhoPorModelo(form.cr4a1_modelo.trim(), form.cr4a1_fabricante?.trim());
+      if (!anterior) {
+        info('Nenhuma peritagem anterior encontrada para esse modelo.');
+        return;
+      }
+      let preenchidos = 0;
+      setForm(prev => {
+        const atualizado = { ...prev };
+        CAMPOS_TECNICOS_MODELO.forEach(campo => {
+          const vazio = !atualizado[campo]?.toString().trim();
+          if (vazio && anterior[campo] != null && anterior[campo] !== '') {
+            atualizado[campo] = anterior[campo];
+            preenchidos++;
+          }
+        });
+        return atualizado;
+      });
+      if (preenchidos > 0) success(`${preenchidos} campo(s) preenchido(s) a partir de uma peritagem anterior.`);
+      else info('Os campos técnicos já estavam preenchidos.');
+    } catch (err) {
+      error('Erro ao buscar dados técnicos. ' + err.message);
+    } finally {
+      setBuscandoDados(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -359,7 +464,7 @@ export default function Cabecalho() {
         setCabecalhoId(cabecalhoId);
         success('Cabeçalho salvo!');
       }
-      navigate('/checklist');
+      navigate('/checklist', { replace: true });
     } catch (err) {
       error('Erro ao salvar cabeçalho. ' + err.message);
     }
@@ -374,7 +479,14 @@ export default function Cabecalho() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
       <TopBar title={cabecalhoExistenteId ? 'Editar Cabeçalho' : 'Cabeçalho'} logoSrc={Logo} />
       <AbaPeritagens />
-      <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+      <StepHeader currentIndex={stepIndex} maxReached={maxStepReached} onStepClick={irParaStep} />
+      <form
+        onSubmit={handleSubmit}
+        ref={formScrollRef}
+        style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column' }}
+      >
+        <input type="hidden" name="cr4a1_filial" value={form.cr4a1_filial} />
+
         {modoOffline && (
           <motion.p
             initial={{ opacity: 0, y: -10 }}
@@ -385,91 +497,127 @@ export default function Cabecalho() {
           </motion.p>
         )}
 
-        {/* Card Identificação */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-          <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
-            <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Identificação do Equipamento</h3>
-            <FloatingField label="OS *" name="cr4a1_os" value={form.cr4a1_os} onChange={handleChange} readOnly delay={0} />
-            <FloatingField label="Cliente" name="cr4a1_cliente" value={form.cr4a1_cliente} onChange={handleChange} readOnly delay={0.05} />
-            <FloatingField label="Área *" name="cr4a1_area" value={form.cr4a1_area} onChange={handleChange} delay={0.1} required />
-            <FloatingField label="Nº Série *" name="cr4a1_n_serie" value={form.cr4a1_n_serie} onChange={handleChange} delay={0.15} required />
-            <FloatingField label="OS Retorno *" name="cr4a1_os_retorno" value={form.cr4a1_os_retorno} onChange={handleChange} delay={0.2} required />
-          </ElevatedCard>
-        </motion.div>
+        <AnimatePresence mode="wait">
+          {stepIndex === 0 && (
+            <motion.div
+              key="identificacao"
+              initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25 }}
+            >
+              <ElevatedCard style={{ padding: 20, marginBottom: 16 }}>
+                <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Identificação do Equipamento</h3>
+                <FloatingField label="OS" name="cr4a1_os" value={form.cr4a1_os} onChange={handleChange} readOnly delay={0} />
+                <FloatingField label="Cliente" name="cr4a1_cliente" value={form.cr4a1_cliente} onChange={handleChange} readOnly delay={0.03} />
+                <FloatingField label="Área *" name="cr4a1_area" value={form.cr4a1_area} onChange={handleChange} delay={0.06} required />
+                <FloatingField label="Nº Série *" name="cr4a1_n_serie" value={form.cr4a1_n_serie} onChange={handleChange} delay={0.09} required />
+                <FloatingField label="OS Retorno *" name="cr4a1_os_retorno" value={form.cr4a1_os_retorno} onChange={handleChange} delay={0.12} required />
+              </ElevatedCard>
+            </motion.div>
+          )}
 
-        {/* Card Dados Técnicos */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
-          <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
-            <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Dados Técnicos</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-              <FloatingField label="Tensão *" name="cr4a1_tensao" value={form.cr4a1_tensao} onChange={handleChange} delay={0.25} required />
-              <FloatingField label="Corrente *" name="cr4a1_corrente" value={form.cr4a1_corrente} onChange={handleChange} delay={0.3} required />
-              <FloatingField label="Modelo *" name="cr4a1_modelo" value={form.cr4a1_modelo} onChange={handleChange} delay={0.35} required />
-              <FloatingField label="Fabricante *" name="cr4a1_fabricante" value={form.cr4a1_fabricante} onChange={handleChange} delay={0.4} required />
-              <FloatingField label="Carcaça *" name="cr4a1_carcaca" value={form.cr4a1_carcaca} onChange={handleChange} delay={0.45} required />
-              <FloatingField label="Potência (CV) *" name="cr4a1_potencia_cv" value={form.cr4a1_potencia_cv} onChange={handleChange} delay={0.5} required />
-              <FloatingField label="Potência (kW) *" name="cr4a1_potencia_kw" value={form.cr4a1_potencia_kw} onChange={handleChange} delay={0.55} required />
-              <FloatingField label="Tag Cliente *" name="cr4a1_tag_cliente" value={form.cr4a1_tag_cliente} onChange={handleChange} delay={0.6} required />
-              <FloatingField label="RPM *" name="cr4a1_rpm" value={form.cr4a1_rpm} onChange={handleChange} delay={0.65} required />
-              <FloatingField label="Polos *" name="cr4a1_polos" value={form.cr4a1_polos} onChange={handleChange} delay={0.7} required />
-              <FloatingField label="Classe *" name="cr4a1_classe" value={form.cr4a1_classe} onChange={handleChange} delay={0.75} required />
-              <FloatingField label="FS *" name="cr4a1_fs" value={form.cr4a1_fs} onChange={handleChange} delay={0.8} required />
-              <FloatingField label="IP *" name="cr4a1_ip" value={form.cr4a1_ip} onChange={handleChange} delay={0.85} required />
-              <FloatingField label="CAT *" name="cr4a1_cat" value={form.cr4a1_cat} onChange={handleChange} delay={0.9} required />
-              <FloatingField label="REG *" name="cr4a1_reg" value={form.cr4a1_reg} onChange={handleChange} delay={0.95} required />
-              <FloatingField label="FC *" name="cr4a1_fc" value={form.cr4a1_fc} onChange={handleChange} delay={1.0} required />
-              <FloatingField label="Frequência *" name="cr4a1_frequencia" value={form.cr4a1_frequencia} onChange={handleChange} delay={1.05} required />
-              <FloatingField label="Peso *" name="cr4a1_peso" value={form.cr4a1_peso} onChange={handleChange} delay={1.1} required />
-              <FloatingField label="Nº REQ *" name="cr4a1_n_req" value={form.cr4a1_n_req} onChange={handleChange} delay={1.15} required />
-              <FloatingField label="Tag Kairós *" name="cr4a1_tag_kairos" value={form.cr4a1_tag_kairos} onChange={handleChange} delay={1.2} required />
-              <FloatingField label="Comprimento *" name="cr4a1_comprimento" value={form.cr4a1_comprimento} onChange={handleChange} delay={1.25} required />
-              <FloatingField label="Largura *" name="cr4a1_largura" value={form.cr4a1_largura} onChange={handleChange} delay={1.3} required />
-              <FloatingField label="Altura *" name="cr4a1_altura" value={form.cr4a1_altura} onChange={handleChange} delay={1.35} required />
-              <FloatingField label="ME *" name="cr4a1_me" value={form.cr4a1_me} onChange={handleChange} delay={1.4} required />
-            </div>
-          </ElevatedCard>
-        </motion.div>
+          {stepIndex === 1 && (
+            <motion.div
+              key="tecnico"
+              initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25 }}
+            >
+              <ElevatedCard style={{ padding: 20, marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+                  <h3 style={{ margin: 0, color: 'var(--md-sys-color-primary)' }}>Dados Técnicos</h3>
+                  <button
+                    type="button"
+                    className="chip-btn chip-btn--sm"
+                    onClick={buscarDadosAutomaticos}
+                    disabled={buscandoDados || !form.cr4a1_modelo?.trim()}
+                  >
+                    <span className="material-symbols-outlined">{buscandoDados ? 'progress_activity' : 'auto_awesome'}</span>
+                    {buscandoDados ? 'Buscando...' : 'Buscar dados técnicos'}
+                  </button>
+                </div>
+                <p style={{ margin: '0 0 16px', fontSize: '0.75rem', color: 'var(--md-sys-color-on-surface-variant)' }}>
+                  Preenche os campos abaixo com base na última peritagem do mesmo modelo (e fabricante, se informado). Não sobrescreve o que você já digitou.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                  <FloatingField label="Tensão *" name="cr4a1_tensao" value={form.cr4a1_tensao} onChange={handleChange} delay={0.02} required />
+                  <FloatingField label="Corrente *" name="cr4a1_corrente" value={form.cr4a1_corrente} onChange={handleChange} delay={0.04} required />
+                  <FloatingField label="Modelo *" name="cr4a1_modelo" value={form.cr4a1_modelo} onChange={handleChange} delay={0.06} required />
+                  <FloatingField label="Fabricante *" name="cr4a1_fabricante" value={form.cr4a1_fabricante} onChange={handleChange} delay={0.08} required />
+                  <FloatingField label="Carcaça *" name="cr4a1_carcaca" value={form.cr4a1_carcaca} onChange={handleChange} delay={0.1} required />
+                  <FloatingField label="Potência (CV) *" name="cr4a1_potencia_cv" value={form.cr4a1_potencia_cv} onChange={handleChange} delay={0.12} required />
+                  <FloatingField label="Potência (kW) *" name="cr4a1_potencia_kw" value={form.cr4a1_potencia_kw} onChange={handleChange} delay={0.14} required />
+                  <FloatingField label="Tag Cliente *" name="cr4a1_tag_cliente" value={form.cr4a1_tag_cliente} onChange={handleChange} delay={0.16} required />
+                  <FloatingField label="RPM *" name="cr4a1_rpm" value={form.cr4a1_rpm} onChange={handleChange} delay={0.18} required />
+                  <FloatingField label="Polos *" name="cr4a1_polos" value={form.cr4a1_polos} onChange={handleChange} delay={0.2} required />
+                  <FloatingField label="Classe *" name="cr4a1_classe" value={form.cr4a1_classe} onChange={handleChange} delay={0.22} required />
+                  <FloatingField label="FS *" name="cr4a1_fs" value={form.cr4a1_fs} onChange={handleChange} delay={0.24} required />
+                  <FloatingField label="IP *" name="cr4a1_ip" value={form.cr4a1_ip} onChange={handleChange} delay={0.26} required />
+                  <FloatingField label="CAT *" name="cr4a1_cat" value={form.cr4a1_cat} onChange={handleChange} delay={0.28} required />
+                  <FloatingField label="REG *" name="cr4a1_reg" value={form.cr4a1_reg} onChange={handleChange} delay={0.3} required />
+                  <FloatingField label="FC *" name="cr4a1_fc" value={form.cr4a1_fc} onChange={handleChange} delay={0.32} required />
+                  <FloatingField label="Frequência *" name="cr4a1_frequencia" value={form.cr4a1_frequencia} onChange={handleChange} delay={0.34} required />
+                  <FloatingField label="Peso *" name="cr4a1_peso" value={form.cr4a1_peso} onChange={handleChange} delay={0.36} required />
+                  <FloatingField label="Nº REQ *" name="cr4a1_n_req" value={form.cr4a1_n_req} onChange={handleChange} delay={0.38} required />
+                  <FloatingField label="Tag Kairós *" name="cr4a1_tag_kairos" value={form.cr4a1_tag_kairos} onChange={handleChange} delay={0.4} required />
+                  <FloatingField label="Comprimento *" name="cr4a1_comprimento" value={form.cr4a1_comprimento} onChange={handleChange} delay={0.42} required />
+                  <FloatingField label="Largura *" name="cr4a1_largura" value={form.cr4a1_largura} onChange={handleChange} delay={0.44} required />
+                  <FloatingField label="Altura *" name="cr4a1_altura" value={form.cr4a1_altura} onChange={handleChange} delay={0.46} required />
+                  <FloatingField label="ME *" name="cr4a1_me" value={form.cr4a1_me} onChange={handleChange} delay={0.48} required />
+                </div>
+              </ElevatedCard>
+            </motion.div>
+          )}
 
-        {/* Card Equipe */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.4 }}>
-          <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
-            <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Equipe</h3>
-            <ReadOnlyField label="Peritador" value={nomePeritador} delay={1.45} />
-            {modoOffline ? (
-              <FloatingField
-                label="Mecânico *"
-                name="cr4a1_mecanico"
-                value={form.cr4a1_mecanico}
-                onChange={handleChange}
-                placeholder="Nome do mecânico"
-                delay={1.5}
-                required
-              />
-            ) : (
-              <AnimatedSelect
-                label="Mecânico *"
-                name="cr4a1_mecanico"
-                value={form.cr4a1_mecanico}
-                onChange={handleChange}
-                options={mecanicosOptions}
-                delay={1.5}
-                required
-              />
-            )}
-          </ElevatedCard>
-        </motion.div>
+          {stepIndex === 2 && (
+            <motion.div
+              key="equipe"
+              initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25 }}
+            >
+              <ElevatedCard style={{ padding: 20, marginBottom: 16 }}>
+                <h3 style={{ margin: '0 0 16px', color: 'var(--md-sys-color-primary)' }}>Equipe</h3>
+                <ReadOnlyField label="Peritador" value={nomePeritador} delay={0} />
+                {modoOffline ? (
+                  <FloatingField
+                    label="Mecânico *"
+                    name="cr4a1_mecanico"
+                    value={form.cr4a1_mecanico}
+                    onChange={handleChange}
+                    placeholder="Nome do mecânico"
+                    delay={0.05}
+                    required
+                  />
+                ) : (
+                  <AnimatedSelect
+                    label="Mecânico *"
+                    name="cr4a1_mecanico"
+                    value={form.cr4a1_mecanico}
+                    onChange={handleChange}
+                    options={mecanicosOptions}
+                    delay={0.05}
+                    required
+                  />
+                )}
+              </ElevatedCard>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <input type="hidden" name="cr4a1_filial" value={form.cr4a1_filial} />
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.6, duration: 0.3 }}
-        >
-          <FilledButton type="submit" disabled={!formCompleto} style={{ width: '100%', marginTop: 8 }}>
-            {formCompleto ? 'Salvar e Iniciar Checklist' : 'Preencha todos os campos'}
-          </FilledButton>
-        </motion.div>
+        <div style={{ display: 'flex', gap: 12, marginTop: 'auto', paddingTop: 8 }}>
+          {stepIndex > 0 && (
+            <OutlinedButton type="button" onClick={handleAnterior} style={{ flex: 1 }}>
+              Anterior
+            </OutlinedButton>
+          )}
+          {!ultimoStep ? (
+            <FilledButton type="button" onClick={handleProximo} disabled={!stepAtualCompleto} style={{ flex: 2 }}>
+              Próximo
+            </FilledButton>
+          ) : (
+            <FilledButton type="submit" disabled={!formCompleto} style={{ flex: 2 }}>
+              {formCompleto ? 'Salvar e Iniciar Checklist' : 'Preencha todos os campos'}
+            </FilledButton>
+          )}
+        </div>
       </form>
     </div>
   );
