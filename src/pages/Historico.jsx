@@ -9,7 +9,7 @@ import Logo from '../assets/Medro llogo horizontal-Medro.svg';
 
 export default function Historico() {
   const username = sessionStorage.getItem('dv_username');
-  const { getCabecalhosPorFilial, getUsuarioLogado, getModeloItens, getInspecoes } = useDataverse();
+  const { getCabecalhosPorFilial, getUsuarioLogado } = useDataverse();
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState('');
@@ -21,11 +21,7 @@ export default function Historico() {
         if (!username) return;
         const userData = await getUsuarioLogado(username);
         const filial = userData?.cr4a1_filial;
-        const [modeloItens, cabecalhos, todosItens] = await Promise.all([
-          getModeloItens(),
-          getCabecalhosPorFilial(filial),
-          getInspecoes(),
-        ]);
+        const cabecalhos = await getCabecalhosPorFilial(filial);
 
         const concluidas = cabecalhos.filter(cab => cab.cr4a1_status === 'Concluída');
 

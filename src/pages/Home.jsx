@@ -20,7 +20,7 @@ export default function Home() {
     getUsuarioLogado,
     getCabecalhosPorFilial,
     getModeloItens,
-    getInspecoes,
+    getInspecoesPorOS,
     getCabecalhoByOS,
     getOSPendentes,
   } = useDataverse();
@@ -82,12 +82,19 @@ export default function Home() {
         setDadosUsuario(userData);
         const filial = userData?.cr4a1_filial;
 
-        const [modeloItens, cabecalhos, todosItens, pendentes] = await Promise.all([
+        const [modeloItens, cabecalhos, pendentes] = await Promise.all([
           getModeloItens(),
           getCabecalhosPorFilial(filial),
-          getInspecoes(),
           getOSPendentes(filial),
         ]);
+
+        // Só busca respostas das OS em andamento dessa filial, em vez da
+        // tabela cr4a1_peritagem_b04 inteira (toda resposta de toda
+        // peritagem já feita, de qualquer filial).
+        const osEmAndamento = cabecalhos
+          .filter(cab => cab.cr4a1_status !== 'Concluída')
+          .map(cab => cab.cr4a1_os);
+        const todosItens = await getInspecoesPorOS(osEmAndamento);
 
         // ---- Peritagens em andamento ----
         const tiposDoModelo = [...new Set(modeloItens.map(i => i.cr4a1_tipo).filter(Boolean))];

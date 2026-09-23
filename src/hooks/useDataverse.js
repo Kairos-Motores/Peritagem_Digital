@@ -158,9 +158,15 @@ export function useDataverse() {
     return { success: true };
   };
 
-  const getInspecoes = async () => {
+  // Busca respostas de checklist só das OS informadas (ex.: as "em
+  // andamento" de uma filial), em vez da tabela cr4a1_peritagem_b04 inteira
+  // — essa tabela acumula toda resposta de toda peritagem já feita, então
+  // buscá-la sem filtro fica mais lento conforme o histórico cresce.
+  const getInspecoesPorOS = async (osList) => {
+    if (!osList || osList.length === 0) return [];
     const entitySet = await resolveEntitySet('cr4a1_peritagem_b04');
-    const data = await callApi(`/${entitySet}`);
+    const filtro = osList.map(os => `cr4a1_os eq '${encodeURIComponent(os)}'`).join(' or ');
+    const data = await callApi(`/${entitySet}?$filter=${filtro}&$select=cr4a1_os,cr4a1_item`);
     return data?.value || [];
   };
 
@@ -318,7 +324,7 @@ export function useDataverse() {
     getUsuarios,
     getUsuarioLogado,
     getModeloItens,
-    getInspecoes,
+    getInspecoesPorOS,
     createCabecalho,
     updateCabecalho,
     getUltimoCabecalhoPorModelo,
