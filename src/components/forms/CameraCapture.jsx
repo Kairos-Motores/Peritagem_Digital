@@ -177,7 +177,7 @@ export default function CameraCapture({ open, onClose, onCapture }) {
           </div>
         )}
 
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', padding: 16 }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', padding: 16, paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
           <button onClick={onClose} style={{ ...botaoIconeStyle, backgroundColor: 'rgba(0,0,0,0.5)' }} aria-label="Fechar câmera">
             <span className="material-symbols-outlined">close</span>
           </button>
@@ -195,7 +195,7 @@ export default function CameraCapture({ open, onClose, onCapture }) {
           )}
         </div>
 
-        <div style={{ position: 'absolute', bottom: 32, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ position: 'absolute', bottom: 'calc(32px + env(safe-area-inset-bottom))', left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
           <button
             onClick={capturar}
             disabled={!pronto}

@@ -8,6 +8,7 @@ import ProgressBar from '../components/ui/ProgressBar';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import TopBar from '../components/navigation/TopBar';
 import FloatingNav from '../components/navigation/FloatingNav';
+import SearchInput from '../components/ui/SearchInput';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from '../assets/Medro llogo horizontal-Medro.svg';
 import { useOffline } from '../contexts/OfflineContext';
@@ -298,37 +299,7 @@ export default function Home() {
           </h2>
 
           {/* Barra de pesquisa para em andamento */}
-          <div style={{ position: 'relative', marginBottom: 16 }}>
-            <span
-              className="material-symbols-outlined"
-              style={{
-                position: 'absolute',
-                left: 12,
-                top: 10,
-                color: 'var(--md-sys-color-on-surface-variant)',
-                fontSize: 20,
-              }}
-            >
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Pesquisar OS..."
-              value={buscaAndamento}
-              onChange={(e) => setBuscaAndamento(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 12px 10px 38px',
-                borderRadius: 28,
-                border: '1px solid var(--md-sys-color-outline)',
-                backgroundColor: 'var(--md-sys-color-surface-variant)',
-                color: 'var(--md-sys-color-on-surface)',
-                fontSize: '0.9rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-              }}
-            />
-          </div>
+          <SearchInput value={buscaAndamento} onChange={setBuscaAndamento} placeholder="Pesquisar OS..." />
 
           <motion.div layout style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
             {cardsFiltrados.length === 0 && (
@@ -454,37 +425,7 @@ export default function Home() {
           </h2>
 
           {/* Barra de pesquisa para pendentes */}
-          <div style={{ position: 'relative', marginBottom: 16 }}>
-            <span
-              className="material-symbols-outlined"
-              style={{
-                position: 'absolute',
-                left: 12,
-                top: 10,
-                color: 'var(--md-sys-color-on-surface-variant)',
-                fontSize: 20,
-              }}
-            >
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Pesquisar OS..."
-              value={buscaPendentes}
-              onChange={(e) => setBuscaPendentes(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 12px 10px 38px',
-                borderRadius: 28,
-                border: '1px solid var(--md-sys-color-outline)',
-                backgroundColor: 'var(--md-sys-color-surface-variant)',
-                color: 'var(--md-sys-color-on-surface)',
-                fontSize: '0.9rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-              }}
-            />
-          </div>
+          <SearchInput value={buscaPendentes} onChange={setBuscaPendentes} placeholder="Pesquisar OS..." />
 
           {pendentesFiltrados.length === 0 && (
             <p style={{ color: 'var(--md-sys-color-on-surface-variant)' }}>

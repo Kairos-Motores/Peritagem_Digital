@@ -84,39 +84,13 @@ export default function AlbumFotos({ os, fotos = [], filial = 'SemFilial', clien
         <h2 style={{ margin: 0, color: 'var(--md-sys-color-on-surface)', fontSize: '1.1rem' }}>Álbum de Fotos</h2>
         <div style={{ display: 'flex', gap: 8 }}>
           {!readonly && (
-            <button
-              onClick={() => setModalAberto(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                background: 'var(--md-sys-color-primary)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 20,
-                padding: '6px 14px',
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                fontWeight: 500,
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add_photo_alternate</span>
+            <button className="chip-btn chip-btn--filled" onClick={() => setModalAberto(true)}>
+              <span className="material-symbols-outlined">add_photo_alternate</span>
               Preencher álbum
             </button>
           )}
-          <button
-            onClick={() => setExpanded(!expanded)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'transparent',
-              border: '1px solid var(--md-sys-color-outline)',
-              borderRadius: 20,
-              padding: '6px 14px',
-              cursor: 'pointer',
-              color: 'var(--md-sys-color-primary)',
-              fontSize: '0.85rem',
-              fontWeight: 500,
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 20, transition: 'transform 0.3s', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+          <button className="chip-btn" onClick={() => setExpanded(!expanded)}>
+            <span className="material-symbols-outlined" style={{ transition: 'transform 0.3s', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
               expand_more
             </span>
             <span>{expanded ? 'Colapsar' : 'Expandir'}</span>
@@ -198,8 +172,10 @@ export default function AlbumFotos({ os, fotos = [], filial = 'SemFilial', clien
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000,
         }}>
           <div style={{
-            background: '#fff', borderRadius: 16, padding: 24,
+            background: 'var(--md-sys-color-surface)', color: 'var(--md-sys-color-on-surface)',
+            borderRadius: 16, padding: 24,
             width: '90%', maxWidth: 600, maxHeight: '80vh', overflowY: 'auto',
+            boxShadow: 'var(--md-sys-elevation-3)',
           }}>
             <h3 style={{ marginTop: 0 }}>Selecionar fotos para o álbum</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>

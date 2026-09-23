@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../contexts/ThemeContext';
 import './TopBar.css';
@@ -9,6 +11,7 @@ export default function TopBar({ title, showBack = true, logoSrc, actions = [], 
   const { logout } = useAuth();
   const { isDark, toggleTheme, fontSize, setFontSize } = useTheme();
   const [showFontSlider, setShowFontSlider] = useState(false);
+  const [confirmandoLogout, setConfirmandoLogout] = useState(false);
 
   const handleBack = () => {
     if (onBack) {
@@ -37,7 +40,7 @@ export default function TopBar({ title, showBack = true, logoSrc, actions = [], 
       onClick: () => setShowFontSlider(!showFontSlider),
       label: 'Tamanho da fonte',
     },
-    { icon: 'logout', onClick: handleLogout, label: 'Sair' },
+    { icon: 'logout', onClick: () => setConfirmandoLogout(true), label: 'Sair' },
   ];
 
   return (
@@ -95,6 +98,68 @@ export default function TopBar({ title, showBack = true, logoSrc, actions = [], 
           <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>text_increase</span>
         </div>
       )}
+
+      {confirmandoLogout &&
+        createPortal(
+          <AnimatePresence>
+            <motion.div
+              onClick={() => setConfirmandoLogout(false)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 5000, padding: 24,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+              }}
+            >
+              <motion.div
+                onClick={(e) => e.stopPropagation()}
+                initial={{ opacity: 0, scale: 0.85, y: 30 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: 30 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                style={{
+                  width: '100%', maxWidth: 340,
+                  backgroundColor: 'var(--md-sys-color-surface)', color: 'var(--md-sys-color-on-surface)',
+                  borderRadius: 'var(--md-sys-shape-corner-large)', padding: 24,
+                  boxShadow: 'var(--md-sys-elevation-3)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 26, color: 'var(--md-sys-color-error)' }}>logout</span>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Sair da conta?</h3>
+                </div>
+                <p style={{ margin: '0 0 20px', fontSize: '0.85rem', color: 'var(--md-sys-color-on-surface-variant)' }}>
+                  Você vai precisar entrar de novo para continuar. Peritagens já salvas não são perdidas.
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => setConfirmandoLogout(false)}
+                    style={{
+                      flex: 1, padding: '10px 0', borderRadius: 'var(--md-sys-shape-corner-medium)',
+                      border: '1px solid var(--md-sys-color-outline)', background: 'transparent',
+                      color: 'var(--md-sys-color-on-surface)', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem',
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      flex: 1, padding: '10px 0', borderRadius: 'var(--md-sys-shape-corner-medium)',
+                      border: 'none', background: 'var(--md-sys-color-error)', color: '#fff',
+                      cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
+                    }}
+                  >
+                    Sair
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          </AnimatePresence>,
+          document.body
+        )}
     </header>
   );
 }

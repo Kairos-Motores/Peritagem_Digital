@@ -342,18 +342,18 @@ export default function ModeloItem({
         )}
 
         {onCopiarResposta && (
-          <button type="button" onClick={() => onCopiarResposta(cr4a1_item)} style={{ background: 'transparent', border: '1px solid var(--md-sys-color-outline)', borderRadius: 20, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: 'var(--md-sys-color-primary)', fontSize: '0.8rem' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>content_copy</span> Copiar
+          <button type="button" className="chip-btn chip-btn--sm" onClick={() => onCopiarResposta(cr4a1_item)}>
+            <span className="material-symbols-outlined">content_copy</span> Copiar
           </button>
         )}
         {podeDesfazer && (
-          <button type="button" onClick={handleUndo} style={{ background: 'transparent', border: '1px solid var(--md-sys-color-outline)', borderRadius: 20, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: 'var(--md-sys-color-primary)', fontSize: '0.8rem' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>undo</span> Desfazer
+          <button type="button" className="chip-btn chip-btn--sm" onClick={handleUndo}>
+            <span className="material-symbols-outlined">undo</span> Desfazer
           </button>
         )}
         {onTirarFoto && (
-          <button type="button" onClick={(e) => { e.stopPropagation(); onTirarFoto(cr4a1_item); }} style={{ background: 'transparent', border: '1px solid var(--md-sys-color-outline)', borderRadius: 20, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: 'var(--md-sys-color-primary)' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>photo_camera</span> Fotos ({fotosCount})
+          <button type="button" className="chip-btn chip-btn--sm" onClick={(e) => { e.stopPropagation(); onTirarFoto(cr4a1_item); }}>
+            <span className="material-symbols-outlined">photo_camera</span> Fotos ({fotosCount})
           </button>
         )}
       </div>
