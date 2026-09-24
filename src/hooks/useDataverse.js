@@ -74,6 +74,17 @@ export function useDataverse() {
     return data?.value || [];
   };
 
+  // Modelos de peritagem ativos (cr4a1_id é a numeração automática usada
+  // na coluna cr4a1_modeloperitagem da b01 e do cabeçalho)
+  const getModelosPeritagem = async () => {
+    const entitySet = await resolveEntitySet('cr4a1_peritagem_modelo');
+    const select = `$select=cr4a1_peritagem_modeloid,cr4a1_id,cr4a1_nome,cr4a1_descricao`;
+    const data = await callApi(`/${entitySet}?$filter=statecode eq 0&${select}`);
+    return (data?.value || [])
+      .filter(m => m.cr4a1_id)
+      .sort((a, b) => Number(a.cr4a1_id) - Number(b.cr4a1_id));
+  };
+
   // Obtém a filial do peritador logado
   const getFilialPeritador = async (username) => {
     const userData = await getUsuarioLogado(username);
@@ -85,7 +96,7 @@ export function useDataverse() {
     if (!filial) return [];
     const entitySet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
     const filter = `$filter=cr4a1_filial eq '${encodeURIComponent(filial)}'`;
-    const select = `$select=cr4a1_os,cr4a1_peritador,cr4a1_status,cr4a1_tem_fotos`;
+    const select = `$select=cr4a1_os,cr4a1_peritador,cr4a1_status,cr4a1_tem_fotos,cr4a1_modeloperitagem`;
     const data = await callApi(`/${entitySet}?${filter}&${select}`);
     return data?.value || [];
   };
@@ -324,6 +335,7 @@ export function useDataverse() {
     getUsuarios,
     getUsuarioLogado,
     getModeloItens,
+    getModelosPeritagem,
     getInspecoesPorOS,
     createCabecalho,
     updateCabecalho,

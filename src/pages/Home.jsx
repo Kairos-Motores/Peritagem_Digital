@@ -11,6 +11,7 @@ import FloatingNav from '../components/navigation/FloatingNav';
 import SearchInput from '../components/ui/SearchInput';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from '../assets/Medro llogo horizontal-Medro.svg';
+import { filtrarItensPorModelo } from '../utils/modelo';
 import { useOffline } from '../contexts/OfflineContext';
 import { listarPendentes } from '../db/offlineStore';
 
@@ -97,9 +98,6 @@ export default function Home() {
         const todosItens = await getInspecoesPorOS(osEmAndamento);
 
         // ---- Peritagens em andamento ----
-        const tiposDoModelo = [...new Set(modeloItens.map(i => i.cr4a1_tipo).filter(Boolean))];
-        const totalTipos = tiposDoModelo.length;
-
         const itensPorOS = {};
         todosItens.forEach(item => {
           const os = item.cr4a1_os;
@@ -112,10 +110,14 @@ export default function Home() {
           .map(cab => {
             const os = cab.cr4a1_os;
             const itensRespondidosSet = itensPorOS[os] || new Set();
+            // O progresso é medido só contra os itens do modelo desta peritagem
+            const itensDoModeloDaOS = filtrarItensPorModelo(modeloItens, cab.cr4a1_modeloperitagem);
+            const tiposDoModelo = [...new Set(itensDoModeloDaOS.map(i => i.cr4a1_tipo).filter(Boolean))];
+            const totalTipos = tiposDoModelo.length;
             let somaProgresso = 0;
             const progressoPorTipo = {};
             tiposDoModelo.forEach(tipo => {
-              const itensDoTipo = modeloItens.filter(i => i.cr4a1_tipo === tipo);
+              const itensDoTipo = itensDoModeloDaOS.filter(i => i.cr4a1_tipo === tipo);
               const totalItensTipo = itensDoTipo.length;
               const respondidosTipo = itensDoTipo.filter(item =>
                 itensRespondidosSet.has(item.cr4a1_item)

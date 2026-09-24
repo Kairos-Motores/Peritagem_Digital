@@ -12,8 +12,10 @@ import { useOffline } from '../contexts/OfflineContext';
 import { salvarInspecaoOffline, obterInspecaoPorOS } from '../db/offlineStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cabecalhoCompleto, camposCompletos, CAMPOS_POR_STEP, CAMPOS_TECNICOS_MODELO } from '../utils/cabecalho';
+import { useModelosPeritagem } from '../hooks/useModelosPeritagem';
 
 const STEPS = [
+  { id: 'modelo', label: 'Modelo' },
   { id: 'identificacao', label: 'Identificação' },
   { id: 'tecnico', label: 'Dados Técnicos' },
   { id: 'equipe', label: 'Equipe' },
@@ -269,6 +271,10 @@ export default function Cabecalho() {
   const [stepIndex, setStepIndex] = useState(0);
   const [maxStepReached, setMaxStepReached] = useState(0);
   const [buscandoDados, setBuscandoDados] = useState(false);
+  // Depois que o modelo foi gravado no cabeçalho ele não muda mais: o
+  // checklist já pode ter respostas de linhas que só existem naquele modelo.
+  const [modeloTravado, setModeloTravado] = useState(false);
+  const { modelos, loading: modelosLoading } = useModelosPeritagem();
   const formScrollRef = useRef(null);
 
   const [form, setForm] = useState({
@@ -304,6 +310,7 @@ export default function Cabecalho() {
     cr4a1_peritador: nomePeritador,
     cr4a1_mecanico: '',
     cr4a1_filial: '',
+    cr4a1_modeloperitagem: '',
   });
 
   useEffect(() => {
@@ -354,6 +361,7 @@ export default function Cabecalho() {
       obterInspecaoPorOS(os).then(inspecao => {
         if (inspecao?.cabecalho && Object.keys(inspecao.cabecalho).length > 0) {
           setForm(prev => mesclarCamposConhecidos(prev, inspecao.cabecalho));
+          if (inspecao.cabecalho.cr4a1_modeloperitagem) setModeloTravado(true);
           // Cabeçalho existente: libera navegação livre entre os passos
           if (cabecalhoCompleto(inspecao.cabecalho)) setMaxStepReached(STEPS.length - 1);
         }
@@ -364,6 +372,7 @@ export default function Cabecalho() {
       if (cab) {
         setCabecalhoExistenteId(cab.cr4a1_peritagem_cabecalhoid);
         setForm(prev => mesclarCamposConhecidos(prev, cab));
+        if (cab.cr4a1_modeloperitagem) setModeloTravado(true);
         if (cabecalhoCompleto(cab)) setMaxStepReached(STEPS.length - 1);
       }
     }).catch(console.warn);
@@ -375,8 +384,14 @@ export default function Cabecalho() {
   };
 
   // Campos que o peritador precisa preencher para liberar o checklist
-  const formCompleto = cabecalhoCompleto(form);
-  const stepAtualCompleto = camposCompletos(form, CAMPOS_POR_STEP[STEPS[stepIndex].id]);
+  // Só existe um modelo cadastrado: já vem selecionado (o peritador ainda
+  // vê e confirma no passo).
+  const modeloEfetivo = form.cr4a1_modeloperitagem
+    || (!modeloTravado && modelos.length === 1 ? modelos[0].cr4a1_id : '');
+  const formEfetivo = { ...form, cr4a1_modeloperitagem: modeloEfetivo };
+  const formCompleto = cabecalhoCompleto(formEfetivo) && !!modeloEfetivo;
+  const passoAtual = STEPS[stepIndex].id;
+  const stepAtualCompleto = camposCompletos(formEfetivo, CAMPOS_POR_STEP[passoAtual]);
   const ultimoStep = stepIndex === STEPS.length - 1;
 
   const irParaStep = (i) => {
@@ -449,18 +464,18 @@ export default function Cabecalho() {
         await salvarInspecaoOffline({
           ...(existente || {}),
           os,
-          cabecalho: form,
+          cabecalho: formEfetivo,
           respostas: existente?.respostas || {},
           fotos: existente?.fotos || [],
         });
         setCabecalhoId(cabecalhoExistenteId);
         success('Cabeçalho salvo offline!');
       } else if (cabecalhoExistenteId) {
-        await updateCabecalho(cabecalhoExistenteId, form);
+        await updateCabecalho(cabecalhoExistenteId, formEfetivo);
         setCabecalhoId(cabecalhoExistenteId);
         success('Cabeçalho atualizado!');
       } else {
-        const cabecalhoId = await createCabecalho(form);
+        const cabecalhoId = await createCabecalho(formEfetivo);
         setCabecalhoId(cabecalhoId);
         success('Cabeçalho salvo!');
       }
@@ -498,7 +513,66 @@ export default function Cabecalho() {
         )}
 
         <AnimatePresence mode="wait">
-          {stepIndex === 0 && (
+          {passoAtual === 'modelo' && (
+            <motion.div
+              key="modelo"
+              initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25 }}
+            >
+              <ElevatedCard style={{ padding: 20, marginBottom: 16 }}>
+                <h3 style={{ margin: '0 0 4px', color: 'var(--md-sys-color-primary)' }}>Modelo de Peritagem</h3>
+                <p style={{ margin: '0 0 16px', fontSize: '0.8rem', color: 'var(--md-sys-color-on-surface-variant)' }}>
+                  {modeloTravado
+                    ? 'O modelo não pode ser alterado depois que a peritagem foi iniciada.'
+                    : 'Escolha o modelo que corresponde a este equipamento. Ele define quais itens aparecem no checklist.'}
+                </p>
+                {modelosLoading ? (
+                  <p style={{ color: 'var(--md-sys-color-on-surface-variant)' }}>Carregando modelos...</p>
+                ) : modelos.length === 0 ? (
+                  <p style={{ color: 'var(--md-sys-color-error)' }}>
+                    Nenhum modelo de peritagem disponível. Conecte-se à internet para carregar a lista.
+                  </p>
+                ) : (
+                  <div role="radiogroup" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {modelos.map(m => {
+                      const selecionado = modeloEfetivo === m.cr4a1_id;
+                      const bloqueado = modeloTravado && !selecionado;
+                      return (
+                        <button
+                          key={m.cr4a1_peritagem_modeloid}
+                          type="button"
+                          role="radio"
+                          aria-checked={selecionado}
+                          disabled={modeloTravado}
+                          onClick={() => setForm(prev => ({ ...prev, cr4a1_modeloperitagem: m.cr4a1_id }))}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%',
+                            padding: '14px 16px', borderRadius: 16, cursor: modeloTravado ? 'default' : 'pointer',
+                            border: `2px solid ${selecionado ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-outline-variant)'}`,
+                            backgroundColor: selecionado ? 'var(--md-sys-color-primary-container)' : 'var(--md-sys-color-surface)',
+                            color: selecionado ? 'var(--md-sys-color-on-primary-container)' : 'var(--md-sys-color-on-surface)',
+                            opacity: bloqueado ? 0.5 : 1, transition: 'all 0.2s', minHeight: 56,
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 26, color: 'var(--md-sys-color-primary)' }}>
+                            {selecionado ? 'radio_button_checked' : 'radio_button_unchecked'}
+                          </span>
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <strong style={{ display: 'block', fontSize: '0.95rem' }}>{m.cr4a1_nome}</strong>
+                            {m.cr4a1_descricao && (
+                              <span style={{ display: 'block', fontSize: '0.8rem', opacity: 0.8, marginTop: 2 }}>{m.cr4a1_descricao}</span>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </ElevatedCard>
+            </motion.div>
+          )}
+
+          {passoAtual === 'identificacao' && (
             <motion.div
               key="identificacao"
               initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
@@ -515,7 +589,7 @@ export default function Cabecalho() {
             </motion.div>
           )}
 
-          {stepIndex === 1 && (
+          {passoAtual === 'tecnico' && (
             <motion.div
               key="tecnico"
               initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
@@ -567,7 +641,7 @@ export default function Cabecalho() {
             </motion.div>
           )}
 
-          {stepIndex === 2 && (
+          {passoAtual === 'equipe' && (
             <motion.div
               key="equipe"
               initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}

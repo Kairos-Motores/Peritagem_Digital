@@ -1,6 +1,10 @@
 // Passos do formulário de cabeçalho, cada um com seus campos obrigatórios.
-// A soma dos três é igual a CAMPOS_CABECALHO_OBRIGATORIOS.
+// A soma de identificacao + tecnico + equipe é igual a
+// CAMPOS_CABECALHO_OBRIGATORIOS. O modelo de peritagem fica de fora dessa
+// lista de propósito: é exigido ao salvar no formulário, mas peritagens
+// antigas (sem modelo) precisam continuar liberando o checklist.
 export const CAMPOS_POR_STEP = {
+  modelo: ['cr4a1_modeloperitagem'],
   identificacao: ['cr4a1_area', 'cr4a1_n_serie', 'cr4a1_os_retorno'],
   tecnico: [
     'cr4a1_tensao', 'cr4a1_corrente', 'cr4a1_modelo', 'cr4a1_fabricante', 'cr4a1_carcaca',

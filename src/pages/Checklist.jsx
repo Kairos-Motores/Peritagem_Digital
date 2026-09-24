@@ -17,6 +17,7 @@ import { useFirstTimeTips } from '../hooks/useFirstTimeTips';
 import { useModeloOffline } from '../hooks/useModeloOffline';
 import { salvarInspecaoOffline, obterInspecaoPorOS } from '../db/offlineStore';
 import { cabecalhoCompleto } from '../utils/cabecalho';
+import { filtrarItensPorModelo } from '../utils/modelo';
 
 function formatDistanceToNow(date) {
   const minutes = Math.round((Date.now() - date.getTime()) / 60000);
@@ -33,7 +34,7 @@ export default function Checklist() {
   const { modoOffline } = useOffline();
   const { playSuccess, playComplete, vibrate, playClick } = useAudioFeedback();
   const { show: showTips, markSeen } = useFirstTimeTips();
-  const { itensModelo, loading: modeloLoading } = useModeloOffline();
+  const { itensModelo: todosItensModelo, loading: modeloLoading } = useModeloOffline();
 
   const [respostas, setRespostas] = useState({});
   const [tipoSelecionado, setTipoSelecionado] = useState(null);
@@ -73,12 +74,26 @@ export default function Checklist() {
 
   const os = inspecaoAtual?.os;
   const userToken = sessionStorage.getItem('dv_token');
-  const [cabecalhoValidado, setCabecalhoValidado] = useState(false);
+  // Guarda de qual OS o cabeçalho já foi validado e qual o modelo de
+  // peritagem dela. Ao trocar de OS, `cabecalhoValidado` volta a ser false
+  // sozinho até a nova OS ser validada (o modelo, e portanto a lista de
+  // itens, pode ser outro).
+  const [validacao, setValidacao] = useState({ os: null, modeloId: '' });
+  const cabecalhoValidado = !!os && validacao.os === os;
+  // Modelo de peritagem gravado no cabeçalho define quais linhas da b01
+  // aparecem. Vazio (peritagens antigas) = todas as linhas; linha da b01 sem
+  // modelo aparece em qualquer modelo.
+  const modeloPeritagemId = cabecalhoValidado ? validacao.modeloId : '';
+  const itensModelo = useMemo(
+    () => (cabecalhoValidado ? filtrarItensPorModelo(todosItensModelo, modeloPeritagemId) : []),
+    [cabecalhoValidado, todosItensModelo, modeloPeritagemId]
+  );
 
   // Bloqueia o checklist enquanto o cabeçalho não estiver completo
   // (fecha o atalho de "Continuar Inspeção" indo direto pro checklist)
   useEffect(() => {
     if (!os) return;
+    const validar = (modeloId = '') => setValidacao({ os, modeloId });
     let ativo = true;
     const bloquear = () => {
       error('Complete o cabeçalho antes de iniciar o checklist.');
@@ -88,14 +103,14 @@ export default function Checklist() {
       obterInspecaoPorOS(os).then(inspecao => {
         if (!ativo) return;
         if (!cabecalhoCompleto(inspecao?.cabecalho)) bloquear();
-        else setCabecalhoValidado(true);
-      }).catch(() => setCabecalhoValidado(true));
+        else validar(inspecao.cabecalho.cr4a1_modeloperitagem || '');
+      }).catch(() => validar());
     } else {
       getCabecalhoByOS(os).then(cab => {
         if (!ativo) return;
         if (!cabecalhoCompleto(cab)) bloquear();
-        else setCabecalhoValidado(true);
-      }).catch(() => setCabecalhoValidado(true));
+        else validar(cab.cr4a1_modeloperitagem || '');
+      }).catch(() => validar());
     }
     return () => { ativo = false; };
   }, [os, modoOffline]);

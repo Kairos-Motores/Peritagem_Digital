@@ -12,9 +12,11 @@ import AlbumFotos from '../components/forms/AlbumFotos';
 import { useOffline } from '../contexts/OfflineContext';
 import { obterInspecaoPorOS } from '../db/offlineStore';
 import { db } from '../db/fila';
+import { useModelosPeritagem } from '../hooks/useModelosPeritagem';
 
 // =============== Ícones (corrigidos) ===============
 const infoIcons = {
+  'Modelo de Peritagem': 'account_tree',
   'Cliente': 'person',
   'Área': 'category',
   'Nº Série': 'tag',
@@ -274,6 +276,7 @@ export default function InspecaoDetalhe() {
   const { retomarInspecao } = useInspecao();
   const { error: toastError, success } = useToast();
   const { modoOffline } = useOffline();
+  const { modelos } = useModelosPeritagem();
   const [cabecalho, setCabecalho] = useState(null);
   const [itens, setItens] = useState([]);
   const [fotos, setFotos] = useState([]);
@@ -435,7 +438,10 @@ export default function InspecaoDetalhe() {
 
   const albumFotos = fotos.filter(f => /_\d+\.jpg$/.test(f.name));
 
+  const modeloDaPeritagem = modelos.find(m => m.cr4a1_id === cabecalho?.cr4a1_modeloperitagem);
+
   const cabecalhoFields = cabecalho ? [
+    { label: 'Modelo de Peritagem', value: modeloDaPeritagem?.cr4a1_nome || cabecalho.cr4a1_modeloperitagem },
     { label: 'Cliente', value: cabecalho.cr4a1_cliente },
     { label: 'Área', value: cabecalho.cr4a1_area },
     { label: 'Nº Série', value: cabecalho.cr4a1_n_serie },
