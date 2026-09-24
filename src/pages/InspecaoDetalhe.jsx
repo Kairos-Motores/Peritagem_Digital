@@ -16,7 +16,6 @@ import { useModelosPeritagem } from '../hooks/useModelosPeritagem';
 
 // =============== Ícones (corrigidos) ===============
 const infoIcons = {
-  'Modelo de Peritagem': 'account_tree',
   'Cliente': 'person',
   'Área': 'category',
   'Nº Série': 'tag',
@@ -441,7 +440,6 @@ export default function InspecaoDetalhe() {
   const modeloDaPeritagem = modelos.find(m => m.cr4a1_id === cabecalho?.cr4a1_modeloperitagem);
 
   const cabecalhoFields = cabecalho ? [
-    { label: 'Modelo de Peritagem', value: modeloDaPeritagem?.cr4a1_nome || cabecalho.cr4a1_modeloperitagem },
     { label: 'Cliente', value: cabecalho.cr4a1_cliente },
     { label: 'Área', value: cabecalho.cr4a1_area },
     { label: 'Nº Série', value: cabecalho.cr4a1_n_serie },
@@ -476,7 +474,18 @@ export default function InspecaoDetalhe() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}>
-      <TopBar title={`OS: ${os}`} />
+      <TopBar
+        title={
+          <>
+            OS: {os}
+            {modeloDaPeritagem && (
+              <span style={{ marginLeft: 10, fontSize: '0.85rem', fontWeight: 500, color: 'var(--md-sys-color-primary)' }}>
+                · {modeloDaPeritagem.cr4a1_nome}
+              </span>
+            )}
+          </>
+        }
+      />
       <div className="page-content" style={{ paddingBottom: 24 }}>
         {cabecalho && (
           <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
