@@ -2,6 +2,12 @@ import { useAuth } from './useAuth';
 
 const entitySetCache = {};
 
+// Início do uso do aplicativo: a fila só considera OS que entraram no PCP a
+// partir desta data, para não arrastar anos de OS antigas que nunca tiveram
+// a data de entrada preenchida na ZB6. É meia-noite de 01/10/2026 no horário
+// do Brasil (UTC-3).
+const INICIO_USO_APP = '2026-10-01T03:00:00Z';
+
 export function useDataverse() {
   const { user } = useAuth();
 
@@ -330,10 +336,10 @@ export function useDataverse() {
     const zb6Set = await resolveEntitySet('cr4a1_zb6_relatorio');
     const cabSet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
 
-    // 1. OS da base_medro na filial, setor 'PCP'. Sem limite artificial: um
-    // $top baixo aqui recorta a base ANTES do cruzamento com a ZB6 e esvazia
-    // a fila (as filiais têm milhares de linhas de PCP).
-    const filtroBase = `$filter=cr4a1_unidade eq '${encodeURIComponent(filial)}' and cr4a1_setor eq 'PCP'&$select=cr4a1_os_comp,cr4a1_cliente`;
+    // 1. OS da base_medro na filial que entraram no PCP a partir do início do
+    // uso do app. Sem limite artificial: um $top baixo aqui recorta a base
+    // ANTES do cruzamento com a ZB6 e esvazia a fila.
+    const filtroBase = `$filter=cr4a1_unidade eq '${encodeURIComponent(filial)}' and cr4a1_setor eq 'PCP' and cr4a1_data_inicial ge ${INICIO_USO_APP}&$select=cr4a1_os_comp,cr4a1_cliente`;
     // 2. OS da ZB6 sem data de entrada (ainda não entraram na oficina)
     const filtroZb6 = `$filter=cr4a1_zb6_dtentr eq null&$select=cr4a1_novacoluna`;
     // 3. OS que já têm peritagem (em andamento ou concluída) saem da fila
