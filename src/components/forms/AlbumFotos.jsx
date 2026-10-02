@@ -79,7 +79,7 @@ export default function AlbumFotos({ os, fotos = [], filial = 'SemFilial', clien
   const grid = Array.from({ length: 18 }, (_, i) => i + 1);
 
   return (
-    <div style={{ marginTop: 32, marginBottom: 32 }}>
+    <div data-guia="album" style={{ marginTop: 32, marginBottom: 32 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, padding: '0 4px' }}>
         <h2 style={{ margin: 0, color: 'var(--md-sys-color-on-surface)', fontSize: '1.1rem' }}>Álbum de Fotos</h2>
         <div style={{ display: 'flex', gap: 8 }}>

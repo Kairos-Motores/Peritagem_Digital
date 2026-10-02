@@ -13,7 +13,7 @@ export default function FloatingNav() {
 
   return (
     <div className="floating-nav-container">
-      <nav className="floating-nav">
+      <nav className="floating-nav" data-guia="nav">
         {tabs.map(tab => {
           const isActive = location.pathname === tab.path;
           return (

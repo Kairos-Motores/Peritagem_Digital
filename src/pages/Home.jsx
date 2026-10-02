@@ -270,7 +270,7 @@ export default function Home() {
         )}
 
         {/* ========== COLUNA ESQUERDA: EM ANDAMENTO ========== */}
-        <div style={{ flex: '1 1 55%', minWidth: 280 }}>
+        <div data-guia="em-andamento" style={{ flex: '1 1 55%', minWidth: 280 }}>
           <motion.h1
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -283,9 +283,12 @@ export default function Home() {
           >
             Bem-vindo, {dadosUsuario?.cr4a1_title || username}
           </motion.h1>
-          <SyncStatus />
+          <div data-guia="sync">
+            <SyncStatus />
+          </div>
 
           <motion.div
+            data-guia="nova-inspecao"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2, duration: 0.3 }}
@@ -420,7 +423,7 @@ export default function Home() {
         </div>
 
         {/* ========== COLUNA DIREITA: OS PENDENTES ========== */}
-        <div style={{ flex: '1 1 40%', minWidth: 240 }}>
+        <div data-guia="pendentes" style={{ flex: '1 1 40%', minWidth: 240 }}>
           <h2
             style={{
               color: 'var(--md-sys-color-on-background)',

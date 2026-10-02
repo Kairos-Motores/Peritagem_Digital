@@ -1,225 +1,246 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { PASSOS_GUIA, passosDaRota } from './guiaPassos';
 
-// Passos do guia. Cada um é curto de propósito: é lido em pé, no chão de
-// fábrica, muitas vezes na primeira vez que o peritador abre o app.
-const PASSOS = [
-  {
-    icone: 'waving_hand',
-    titulo: 'Bem-vindo à Peritagem Digital',
-    texto: 'Este guia mostra, em poucos passos, como fazer uma peritagem do começo ao fim. Você pode reabri-lo quando quiser pelo botão de ajuda no topo da tela.',
-  },
-  {
-    icone: 'home',
-    titulo: 'Tela inicial',
-    texto: '"Em andamento" traz as peritagens que você já começou, com a barra de progresso. "OS pendentes de peritagem" é a fila da sua filial. Toque e segure um card para ver um resumo rápido.',
-  },
-  {
-    icone: 'add_circle',
-    titulo: 'Abrir uma peritagem',
-    texto: 'Toque em uma OS da fila ou use "Nova Inspeção" para digitar o número. O app confere se a OS existe antes de liberar o preenchimento.',
-  },
-  {
-    icone: 'account_tree',
-    titulo: 'Escolha do modelo',
-    texto: 'Antes do cabeçalho, escolha o modelo de peritagem do equipamento. Ele define quais itens aparecem no checklist e não pode ser trocado depois que a peritagem começa.',
-  },
-  {
-    icone: 'assignment',
-    titulo: 'Cabeçalho em etapas',
-    texto: 'Os dados do equipamento são preenchidos por etapas. Em "Dados Técnicos", o botão "Buscar dados técnicos" completa os campos vazios usando a última peritagem do mesmo modelo — ele nunca apaga o que você já digitou.',
-  },
-  {
-    icone: 'checklist',
-    titulo: 'Checklist por tipo',
-    texto: 'Os itens são separados por tipo. O chip do tipo fica verde quando todos os itens dele estão respondidos. Use a busca e os filtros "Pendentes" e "Concluídos" para achar um item, e a seta para recolher essa área e ver mais itens na tela.',
-  },
-  {
-    icone: 'touch_app',
-    titulo: 'Respondendo os itens',
-    texto: 'Use os botões + e − ou escolha a opção do item. O campo "Observação" guarda detalhes. "Marcar todos OK" responde de uma vez o que falta no tipo, e "Desfazer" volta a última alteração.',
-  },
-  {
-    icone: 'photo_camera',
-    titulo: 'Fotos',
-    texto: 'O botão "Fotos" dentro do item abre a câmera, com controle de flash. Cada foto fica ligada ao item. No álbum da peritagem você escolhe quais fotos entram nas 18 posições numeradas.',
-  },
-  {
-    icone: 'tab',
-    titulo: 'Várias peritagens abertas',
-    texto: 'O botão + no topo deixa você manter até 3 peritagens abertas e alternar entre elas. O que já foi digitado é salvo antes de cada troca.',
-  },
-  {
-    icone: 'cloud_off',
-    titulo: 'Funciona sem internet',
-    texto: 'Dá para peritar sem sinal: tudo fica guardado no aparelho e sobe sozinho quando a conexão voltar. O indicador na tela inicial mostra quantas peritagens ainda estão para sincronizar.',
-  },
-  {
-    icone: 'check_circle',
-    titulo: 'Pronto para começar',
-    texto: 'É isso. Sempre que precisar rever alguma parte, toque no botão de ajuda na barra do topo.',
-  },
-];
+const MARGEM = 12;       // respiro entre o holofote e a borda do elemento
+const LARGURA_CARD = 340;
 
-// O provider monta este componente só enquanto o guia está aberto, então
-// reabrir sempre começa do primeiro passo.
+// Sem transição de propósito: animar o tamanho a partir de zero deixa a
+// área escura invisível caso a animação não progrida (aba em segundo plano,
+// por exemplo). Quem anima o movimento é o anel.
+const ESTILO_FAIXA = {
+  position: 'fixed', zIndex: 5000, top: 0, left: 0, width: 0, height: 0,
+  backgroundColor: 'rgba(0,0,0,0.65)',
+};
+
 export default function GuiaApp({ onFechar }) {
-  const [passo, setPasso] = useState(0);
+  const { pathname } = useLocation();
 
-  const atual = PASSOS[passo];
-  const ultimo = passo === PASSOS.length - 1;
-  const avancar = () => (ultimo ? onFechar() : setPasso(p => p + 1));
-  const voltar = () => setPasso(p => Math.max(0, p - 1));
+  // Só os passos desta tela cujo elemento realmente existe agora. O guia é
+  // montado apenas quando abre, então ler o DOM aqui é seguro.
+  const [passos] = useState(() => {
+    const daRota = passosDaRota(pathname);
+    const visiveis = daRota.filter(p => !p.alvo || document.querySelector(p.alvo));
+    // Sempre sobra pelo menos a apresentação da tela
+    return visiveis.length > 0 ? visiveis : PASSOS_GUIA.filter(p => p.rota === '*');
+  });
 
-  const botaoBase = {
-    minHeight: 48,
-    padding: '12px 20px',
+  const [indice, setIndice] = useState(0);
+  const atual = passos[indice];
+  const ultimo = indice === passos.length - 1;
+
+  const anelRef = useRef(null);
+  const cardRef = useRef(null);
+  // Quatro faixas escuras ao redor do furo. É mais confiável que um
+  // box-shadow gigante, que nem sempre repinta ao mover o holofote e pesa
+  // na GPU do celular.
+  const faixaTopo = useRef(null);
+  const faixaBaixo = useRef(null);
+  const faixaEsq = useRef(null);
+  const faixaDir = useRef(null);
+
+  const avancar = () => (ultimo ? onFechar() : setIndice(i => i + 1));
+  const voltar = () => setIndice(i => Math.max(0, i - 1));
+
+  // Rola o alvo para o centro antes de medir
+  useEffect(() => {
+    if (!atual?.alvo) return;
+    document.querySelector(atual.alvo)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [atual]);
+
+  // Posiciona holofote e card direto no DOM (sem estado) para não disparar
+  // re-render a cada scroll/resize.
+  useLayoutEffect(() => {
+    const posicionar = () => {
+      const anel = anelRef.current;
+      const card = cardRef.current;
+      if (!card) return;
+
+      const el = atual?.alvo ? document.querySelector(atual.alvo) : null;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      if (!el || !anel) {
+        // Passo sem alvo: card centralizado
+        card.style.top = `${Math.max(16, (vh - card.offsetHeight) / 2)}px`;
+        card.style.left = `${Math.max(16, (vw - card.offsetWidth) / 2)}px`;
+        return;
+      }
+
+      const r = el.getBoundingClientRect();
+      const topo = Math.max(8, r.top - MARGEM);
+      const esq = Math.max(8, r.left - MARGEM);
+      const larg = Math.min(vw - 16, r.width + MARGEM * 2);
+      const alt = Math.min(vh - 16, r.height + MARGEM * 2);
+
+      anel.style.top = `${topo}px`;
+      anel.style.left = `${esq}px`;
+      anel.style.width = `${larg}px`;
+      anel.style.height = `${alt}px`;
+
+      const por = (ref, t, e, w, h) => {
+        const n = ref.current;
+        if (!n) return;
+        n.style.top = `${t}px`;
+        n.style.left = `${e}px`;
+        n.style.width = `${Math.max(0, w)}px`;
+        n.style.height = `${Math.max(0, h)}px`;
+      };
+      por(faixaTopo, 0, 0, vw, topo);
+      por(faixaBaixo, topo + alt, 0, vw, vh - (topo + alt));
+      por(faixaEsq, topo, 0, esq, alt);
+      por(faixaDir, topo, esq + larg, vw - (esq + larg), alt);
+
+      // Card abaixo do alvo quando couber; senão acima; senão centralizado
+      const altCard = card.offsetHeight;
+      const abaixo = topo + alt + 12;
+      const acima = topo - altCard - 12;
+      card.style.top = `${abaixo + altCard < vh - 8 ? abaixo : acima > 8 ? acima : Math.max(8, (vh - altCard) / 2)}px`;
+
+      const largCard = card.offsetWidth;
+      const alvoCentro = esq + larg / 2 - largCard / 2;
+      card.style.left = `${Math.min(Math.max(8, alvoCentro), vw - largCard - 8)}px`;
+    };
+
+    posicionar();
+    const id = setTimeout(posicionar, 350); // depois do scroll suave
+    window.addEventListener('resize', posicionar);
+    window.addEventListener('scroll', posicionar, true);
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener('resize', posicionar);
+      window.removeEventListener('scroll', posicionar, true);
+    };
+  }, [atual]);
+
+  if (!atual) return null;
+
+  const temAlvo = !!atual.alvo && !!document.querySelector(atual.alvo);
+
+  const botao = {
+    minHeight: 44,
+    padding: '10px 18px',
     borderRadius: 'var(--md-sys-shape-corner-medium)',
-    fontSize: '0.9rem',
+    fontSize: '0.85rem',
     fontWeight: 600,
     fontFamily: 'inherit',
     cursor: 'pointer',
   };
 
   return createPortal(
-    <AnimatePresence>
+    <>
+      {temAlvo ? (
+        <>
+          <div ref={faixaTopo} onClick={avancar} style={ESTILO_FAIXA} />
+          <div ref={faixaBaixo} onClick={avancar} style={ESTILO_FAIXA} />
+          <div ref={faixaEsq} onClick={avancar} style={ESTILO_FAIXA} />
+          <div ref={faixaDir} onClick={avancar} style={ESTILO_FAIXA} />
+          <div
+            ref={anelRef}
+            onClick={avancar}
+            style={{
+              position: 'fixed', zIndex: 5001, borderRadius: 16, cursor: 'pointer',
+              border: '3px solid var(--md-sys-color-primary)',
+              transition: 'all 0.25s ease',
+            }}
+          />
+        </>
+      ) : (
+        // Passo sem alvo: escurece a tela inteira
+        <div
+          onClick={avancar}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 5000,
+            backgroundColor: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+          }}
+        />
+      )}
+
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Guia do aplicativo"
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.18 }}
         style={{
-          position: 'fixed', inset: 0, zIndex: 5000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          position: 'fixed', zIndex: 5002,
+          width: `min(${LARGURA_CARD}px, calc(100vw - 16px))`,
+          backgroundColor: 'var(--md-sys-color-surface)',
+          color: 'var(--md-sys-color-on-surface)',
+          borderRadius: 'var(--md-sys-shape-corner-large)',
+          boxShadow: 'var(--md-sys-elevation-3)',
           padding: 16,
-          paddingTop: 'calc(16px + env(safe-area-inset-top))',
-          paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',
-          backgroundColor: 'rgba(0,0,0,0.55)',
-          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
         }}
       >
-        <motion.div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Guia do aplicativo"
-          initial={{ opacity: 0, scale: 0.9, y: 24 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 24 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-          style={{
-            display: 'flex', flexDirection: 'column',
-            width: '100%', maxWidth: 460, maxHeight: '100%',
-            backgroundColor: 'var(--md-sys-color-surface)',
-            color: 'var(--md-sys-color-on-surface)',
-            borderRadius: 'var(--md-sys-shape-corner-large)',
-            boxShadow: 'var(--md-sys-elevation-3)',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 12px 12px 20px', borderBottom: '1px solid var(--md-sys-color-outline-variant)',
-          }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--md-sys-color-on-surface-variant)' }}>
-              Guia · {passo + 1} de {PASSOS.length}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <span
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              width: 36, height: 36, borderRadius: '50%',
+              backgroundColor: 'var(--md-sys-color-primary-container)',
+              color: 'var(--md-sys-color-on-primary-container)',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>{atual.icone}</span>
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ margin: 0, fontSize: '1rem', color: 'var(--md-sys-color-primary)' }}>{atual.titulo}</h2>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.04em', color: 'var(--md-sys-color-on-surface-variant)' }}>
+              PASSO {indice + 1} DE {passos.length}
             </span>
+          </div>
+          <button
+            type="button"
+            onClick={onFechar}
+            aria-label="Fechar guia"
+            className="topbar-icon-btn"
+            style={{ flexShrink: 0, color: 'var(--md-sys-color-on-surface-variant)' }}
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <p style={{ margin: '0 0 14px', fontSize: '0.88rem', lineHeight: 1.5, color: 'var(--md-sys-color-on-surface-variant)' }}>
+          {atual.texto}
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 4, flex: 1, flexWrap: 'wrap' }}>
+            {passos.map((p, i) => (
+              <span
+                key={p.titulo}
+                style={{
+                  width: i === indice ? 16 : 6, height: 6, borderRadius: 3,
+                  backgroundColor: i === indice ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-outline-variant)',
+                  transition: 'width 0.2s',
+                }}
+              />
+            ))}
+          </div>
+          {indice > 0 && (
             <button
               type="button"
-              onClick={onFechar}
-              aria-label="Fechar guia"
-              className="topbar-icon-btn"
-              style={{ color: 'var(--md-sys-color-on-surface-variant)' }}
+              onClick={voltar}
+              style={{ ...botao, border: '1px solid var(--md-sys-color-outline)', background: 'transparent', color: 'var(--md-sys-color-on-surface)' }}
             >
-              <span className="material-symbols-outlined">close</span>
+              Voltar
             </button>
-          </div>
-
-          <div style={{ flex: 1, overflowY: 'auto', padding: '28px 24px' }}>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={passo}
-                initial={{ opacity: 0, x: 24 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -24 }}
-                transition={{ duration: 0.2 }}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 16 }}
-              >
-                <span style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 72, height: 72, borderRadius: '50%',
-                  backgroundColor: 'var(--md-sys-color-primary-container)',
-                  color: 'var(--md-sys-color-on-primary-container)',
-                }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 38 }}>{atual.icone}</span>
-                </span>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--md-sys-color-primary)' }}>{atual.titulo}</h2>
-                <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: 1.55, color: 'var(--md-sys-color-on-surface-variant)' }}>
-                  {atual.texto}
-                </p>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          <div style={{ padding: '0 24px 20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-              {PASSOS.map((p, i) => (
-                <button
-                  key={p.icone}
-                  type="button"
-                  onClick={() => setPasso(i)}
-                  aria-label={`Ir para o passo ${i + 1}: ${p.titulo}`}
-                  aria-current={i === passo}
-                  style={{
-                    width: i === passo ? 22 : 8, height: 8, padding: 0,
-                    borderRadius: 4, border: 'none', cursor: 'pointer',
-                    backgroundColor: i === passo ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-outline-variant)',
-                    transition: 'width 0.2s, background-color 0.2s',
-                  }}
-                />
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', gap: 12 }}>
-              {passo > 0 ? (
-                <button
-                  type="button"
-                  onClick={voltar}
-                  style={{
-                    ...botaoBase, flex: 1,
-                    border: '1px solid var(--md-sys-color-outline)',
-                    background: 'transparent', color: 'var(--md-sys-color-on-surface)',
-                  }}
-                >
-                  Anterior
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onFechar}
-                  style={{
-                    ...botaoBase, flex: 1,
-                    border: '1px solid var(--md-sys-color-outline)',
-                    background: 'transparent', color: 'var(--md-sys-color-on-surface-variant)',
-                  }}
-                >
-                  Pular
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={avancar}
-                style={{
-                  ...botaoBase, flex: 2, border: 'none',
-                  backgroundColor: 'var(--md-sys-color-primary)', color: '#fff',
-                }}
-              >
-                {ultimo ? 'Começar' : 'Próximo'}
-              </button>
-            </div>
-          </div>
-        </motion.div>
+          )}
+          <button
+            type="button"
+            onClick={avancar}
+            style={{ ...botao, border: 'none', backgroundColor: 'var(--md-sys-color-primary)', color: '#fff' }}
+          >
+            {ultimo ? 'Concluir' : 'Próximo'}
+          </button>
+        </div>
       </motion.div>
-    </AnimatePresence>,
+    </>,
     document.body
   );
 }

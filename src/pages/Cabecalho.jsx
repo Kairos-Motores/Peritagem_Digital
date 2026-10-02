@@ -23,7 +23,7 @@ const STEPS = [
 
 function StepHeader({ currentIndex, maxReached, onStepClick }) {
   return (
-    <div style={{ display: 'flex', padding: '12px 16px 4px' }}>
+    <div data-guia="passos-cabecalho" style={{ display: 'flex', padding: '12px 16px 4px' }}>
       {STEPS.map((step, i) => {
         const atual = i === currentIndex;
         const concluido = i < currentIndex;
@@ -526,6 +526,7 @@ export default function Cabecalho() {
                     ? 'O modelo não pode ser alterado depois que a peritagem foi iniciada.'
                     : 'Escolha o modelo que corresponde a este equipamento. Ele define quais itens aparecem no checklist.'}
                 </p>
+                <div data-guia="modelo-peritagem">
                 {modelosLoading ? (
                   <p style={{ color: 'var(--md-sys-color-on-surface-variant)' }}>Carregando modelos...</p>
                 ) : modelos.length === 0 ? (
@@ -568,6 +569,7 @@ export default function Cabecalho() {
                     })}
                   </div>
                 )}
+                </div>
               </ElevatedCard>
             </motion.div>
           )}
@@ -600,6 +602,7 @@ export default function Cabecalho() {
                   <h3 style={{ margin: 0, color: 'var(--md-sys-color-primary)' }}>Dados Técnicos</h3>
                   <button
                     type="button"
+                    data-guia="buscar-tecnicos"
                     className="chip-btn chip-btn--sm"
                     onClick={buscarDadosAutomaticos}
                     disabled={buscandoDados || !form.cr4a1_modelo?.trim()}

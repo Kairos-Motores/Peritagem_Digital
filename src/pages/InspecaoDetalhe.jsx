@@ -490,6 +490,7 @@ export default function InspecaoDetalhe() {
         {cabecalho && (
           <ElevatedCard style={{ padding: 20, marginBottom: 24 }}>
             <div
+              data-guia="dados-peritagem"
               onClick={alternarDadosColapsados}
               role="button"
               tabIndex={0}

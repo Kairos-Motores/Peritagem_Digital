@@ -577,6 +577,7 @@ export default function Checklist() {
       {/* Barra-resumo + botão de colapsar tipos/progresso/busca */}
       <button
         type="button"
+        data-guia="resumo-checklist"
         onClick={alternarHeaderColapsado}
         aria-expanded={!headerColapsado}
         style={{
@@ -618,6 +619,7 @@ export default function Checklist() {
           >
       {/* Botões de tipo + Marcar todos OK */}
       <motion.div
+        data-guia="tipos"
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -723,7 +725,7 @@ export default function Checklist() {
       </div>
 
       {/* Campo de busca + chips de status */}
-      <div style={{ padding: '0 16px 8px' }}>
+      <div data-guia="busca-item" style={{ padding: '0 16px 8px' }}>
         <div style={{ position: 'relative' }}>
           <span
             className="material-symbols-outlined"
@@ -775,7 +777,7 @@ export default function Checklist() {
         )}
       </AnimatePresence>
 
-      <div className="page-content" ref={listaItensRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <div className="page-content" data-guia="lista-itens" ref={listaItensRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <AnimatePresence mode="wait">
           <motion.div
             key={tipoSelecionado}

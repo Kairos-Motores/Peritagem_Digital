@@ -154,7 +154,7 @@ export default function AbaPeritagens({ salvarAntesDeTrocar }) {
 
   return (
     <>
-      <motion.div layout className="aba-peritagens-strip">
+      <motion.div layout className="aba-peritagens-strip" data-guia="abas">
         <AnimatePresence initial={false}>
           {inspecoesAbertas.map(insp => {
             const ativa = insp.os === osAtivo;

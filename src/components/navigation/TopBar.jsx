@@ -35,6 +35,7 @@ export default function TopBar({ title, showBack = true, logoSrc, actions = [], 
       icon: 'help',
       onClick: abrirGuia,
       label: 'Guia do aplicativo',
+      guia: 'ajuda',
     },
     // Toggle de tema
     {
@@ -73,6 +74,7 @@ export default function TopBar({ title, showBack = true, logoSrc, actions = [], 
             className="topbar-icon-btn"
             onClick={action.onClick}
             aria-label={action.label || 'Ação'}
+            data-guia={action.guia}
           >
             <span className="material-symbols-outlined">{action.icon}</span>
           </button>
