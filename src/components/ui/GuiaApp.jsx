@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -18,14 +18,26 @@ const ESTILO_FAIXA = {
 export default function GuiaApp({ onFechar }) {
   const { pathname } = useLocation();
 
-  // Só os passos desta tela cujo elemento realmente existe agora. O guia é
-  // montado apenas quando abre, então ler o DOM aqui é seguro.
-  const [passos] = useState(() => {
+  // Só os passos desta tela cujo elemento realmente existe. No primeiro
+  // login o guia abre enquanto a tela ainda carrega, quando nenhum alvo
+  // existe — por isso a lista é reavaliada por alguns instantes.
+  const [tentativa, setTentativa] = useState(0);
+
+  const passos = useMemo(() => {
     const daRota = passosDaRota(pathname);
     const visiveis = daRota.filter(p => !p.alvo || document.querySelector(p.alvo));
     // Sempre sobra pelo menos a apresentação da tela
     return visiveis.length > 0 ? visiveis : PASSOS_GUIA.filter(p => p.rota === '*');
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, tentativa]);
+
+  useEffect(() => {
+    const daRota = passosDaRota(pathname);
+    const esperandoAlvos = daRota.some(p => p.alvo) && !daRota.some(p => p.alvo && document.querySelector(p.alvo));
+    if (!esperandoAlvos || tentativa >= 12) return;
+    const id = setTimeout(() => setTentativa(t => t + 1), 250);
+    return () => clearTimeout(id);
+  }, [pathname, tentativa]);
 
   const [indice, setIndice] = useState(0);
   const atual = passos[indice];
@@ -141,9 +153,11 @@ export default function GuiaApp({ onFechar }) {
             ref={anelRef}
             onClick={avancar}
             style={{
+              // Sem transição: as faixas escuras também não têm, e animar só
+              // o anel o descolaria do furo durante o movimento (além de
+              // travar na posição antiga se a animação for suspensa).
               position: 'fixed', zIndex: 5001, borderRadius: 16, cursor: 'pointer',
               border: '3px solid var(--md-sys-color-primary)',
-              transition: 'all 0.25s ease',
             }}
           />
         </>
