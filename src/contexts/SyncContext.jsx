@@ -84,6 +84,7 @@ export function SyncProvider({ children }) {
               cr4a1_tipo: resposta.tipo,
               cr4a1_peritador: resposta.peritador,
               cr4a1_referencia: JSON.stringify(resposta.referencia || {}),
+              cr4a1_naoaplica: !!resposta.naoAplica,
             });
             delete respostasRestantes[itemId];
             await atualizarInspecaoOffline(inspecao.id, { respostas: respostasRestantes });

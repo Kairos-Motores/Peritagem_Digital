@@ -148,6 +148,16 @@ function ItemCard({ item, index, onViewObservacao }) {
           <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--md-sys-color-primary)', lineHeight: 1.3, overflowWrap: 'anywhere', wordBreak: 'break-word', flex: 1 }}>
             {item.cr4a1_descricao || item.cr4a1_item || 'Item sem nome'}
           </h4>
+          {item.cr4a1_naoaplica && (
+            <span style={{
+              display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+              padding: '2px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 600,
+              backgroundColor: 'var(--md-sys-color-surface-variant)', color: 'var(--md-sys-color-on-surface-variant)',
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>block</span>
+              N/A
+            </span>
+          )}
           {item.cr4a1_observacao && (
             <button
               type="button"
@@ -341,6 +351,7 @@ export default function InspecaoDetalhe() {
               cr4a1_referencia: JSON.stringify(resp.referencia || {}),
               cr4a1_tipolinha: resp.tipolinha || (modeloItem?.cr4a1_tipolinha) || '',
               cr4a1_tiporeferencia: resp.tiporeferencia || (modeloItem?.cr4a1_tiporeferencia) || '',
+              cr4a1_naoaplica: !!resp.naoAplica,
             };
             if (modeloItem) {
               base.cr4a1_peritagem_b04id = modeloItem.cr4a1_peritagem_b04id || base.cr4a1_peritagem_b04id;

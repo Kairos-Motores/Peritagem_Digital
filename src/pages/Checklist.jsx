@@ -124,6 +124,7 @@ export default function Checklist() {
 
   const isRespostaCompleta = (resposta) => {
     if (!resposta) return false;
+    if (resposta.naoAplica) return true;
     const temQuantidade = Object.values(resposta.quantidades || {}).some(v => v > 0);
     const refExistente = Object.keys(resposta.referencia || {}).length > 0;
     const temReferencia = refExistente ? Object.values(resposta.referencia).some(v => v > 0) : true;
@@ -172,7 +173,8 @@ export default function Checklist() {
         pares.forEach(p => { const [op, qty] = p.split(':'); if (op && !isNaN(qty)) quantObj[op] = parseInt(qty); });
         let refObj = {};
         try { if (item.cr4a1_referencia) refObj = JSON.parse(item.cr4a1_referencia); } catch (e) {}
-        const completo = (() => {
+        const naoAplica = !!item.cr4a1_naoaplica;
+        const completo = naoAplica || (() => {
           const temQtd = Object.values(quantObj).some(v => v > 0);
           const refKeys = Object.keys(refObj).length > 0;
           const temRef = refKeys ? Object.values(refObj).some(v => v > 0) : true;
@@ -180,7 +182,7 @@ export default function Checklist() {
         })();
         respostasIniciais[item.cr4a1_item] = {
           item_id: item.cr4a1_item, descricao: item.cr4a1_descricao || '', observacao: item.cr4a1_observacao || '',
-          quantidades: quantObj, referencia: refObj, tipo: item.cr4a1_tipo || '', peritador: inspecaoAtual?.peritador || '', completo,
+          quantidades: quantObj, referencia: refObj, tipo: item.cr4a1_tipo || '', peritador: inspecaoAtual?.peritador || '', naoAplica, completo,
         };
         const modeloItem = itensModelo.find(m => m.cr4a1_item === item.cr4a1_item);
         if (modeloItem) tiposPersistidos.add(modeloItem.cr4a1_tipo);

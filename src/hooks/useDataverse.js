@@ -212,7 +212,7 @@ export function useDataverse() {
   const getItensByOS = async (os) => {
     const entitySet = await resolveEntitySet('cr4a1_peritagem_b04');
     const filter = `$filter=cr4a1_os eq '${encodeURIComponent(os)}'`;
-    const select = `&$select=cr4a1_item,cr4a1_descricao,cr4a1_observacao,cr4a1_var_quant,cr4a1_referencia,cr4a1_tipo`;
+    const select = `&$select=cr4a1_item,cr4a1_descricao,cr4a1_observacao,cr4a1_var_quant,cr4a1_referencia,cr4a1_tipo,cr4a1_naoaplica`;
     const data = await callApi(`/${entitySet}?${filter}${select}`);
     return data?.value || [];
   };
@@ -233,7 +233,8 @@ export function useDataverse() {
     descricao,
     tipo,                // 6º parâmetro – o nome do tipo (ex: "Peça")
     peritador,           // 7º parâmetro – nome do peritador
-    referenciaJson = ''  // 8º parâmetro – JSON da referência
+    referenciaJson = '', // 8º parâmetro – JSON da referência
+    naoAplica = false    // 9º parâmetro – item marcado como "não se aplica"
   ) => {
     const entitySet = await resolveEntitySet('cr4a1_peritagem_b04');
     const filter = `$filter=cr4a1_os eq '${encodeURIComponent(os)}' and cr4a1_item eq '${encodeURIComponent(itemId)}'`;
@@ -249,6 +250,7 @@ export function useDataverse() {
       cr4a1_tipo: tipo || '',
       cr4a1_peritador: peritador || '',
       cr4a1_referencia: referenciaJson || '',
+      cr4a1_naoaplica: !!naoAplica,
     };
 
     if (registro) {
@@ -277,7 +279,8 @@ export function useDataverse() {
         resposta.descricao,
         resposta.tipo,          // 6º → tipo
         resposta.peritador,     // 7º → peritador
-        referenciaJson          // 8º → referência em JSON
+        referenciaJson,         // 8º → referência em JSON
+        resposta.naoAplica      // 9º → não se aplica
       );
     }
   };

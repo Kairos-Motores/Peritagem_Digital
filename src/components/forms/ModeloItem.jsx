@@ -208,16 +208,21 @@ export default function ModeloItem({
   const [observacao, setObservacao] = useState(initialResposta?.observacao || '');
   const [previousValorItem, setPreviousValorItem] = useState(null);
   const [wasComplete, setWasComplete] = useState(false);
+  // Item marcado como "não se aplica": conta como concluído sem exigir
+  // resposta. O que já estiver preenchido não é apagado, só ignorado — ao
+  // desmarcar, a resposta anterior continua exatamente como estava.
+  const [naoAplica, setNaoAplica] = useState(!!initialResposta?.naoAplica);
 
   useEffect(() => {
     if (initialResposta) {
       setValorItem(initialResposta.quantidades || {});
       setValorRef(initialResposta.referencia || {});
       setObservacao(initialResposta.observacao || '');
+      setNaoAplica(!!initialResposta.naoAplica);
     }
   }, [initialResposta]);
 
-  const propagar = useCallback((itemVal, refVal, obs) => {
+  const propagar = useCallback((itemVal, refVal, obs, na) => {
     onChange({
       item_id: cr4a1_item,
       descricao: cr4a1_descricao,
@@ -226,8 +231,15 @@ export default function ModeloItem({
       referencia: refVal || valorRef,
       tipo: cr4a1_tipo,
       tipolinha: cr4a1_tipolinha,   // ← ADICIONE ESTA LINHA
+      naoAplica: na !== undefined ? na : naoAplica,
     });
-  }, [onChange, cr4a1_item, cr4a1_descricao, observacao, valorItem, valorRef, cr4a1_tipo, cr4a1_tipolinha]);
+  }, [onChange, cr4a1_item, cr4a1_descricao, observacao, valorItem, valorRef, cr4a1_tipo, cr4a1_tipolinha, naoAplica]);
+
+  const alternarNaoAplica = () => {
+    const proximo = !naoAplica;
+    setNaoAplica(proximo);
+    propagar(undefined, undefined, undefined, proximo);
+  };
 
   const handleItemChange = (novoValor) => {
     setPreviousValorItem({ ...valorItem });
@@ -249,11 +261,12 @@ export default function ModeloItem({
   };
 
   const itemCompleto = useMemo(() => {
+    if (naoAplica) return true;
     const temQuantidade = Object.values(valorItem).some(v => v > 0);
     const refExistente = opcoesRef.length > 0;
     const temReferencia = refExistente ? Object.values(valorRef).some(v => v > 0) : true;
     return temQuantidade && temReferencia;
-  }, [valorItem, valorRef, opcoesRef]);
+  }, [naoAplica, valorItem, valorRef, opcoesRef]);
 
   useEffect(() => {
     if (itemCompleto && !wasComplete && onItemComplete) {
@@ -286,7 +299,16 @@ export default function ModeloItem({
             <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--md-sys-color-primary)', flexShrink: 0 }} />
           )}
         </div>
-        {itemCompleto && (
+        {naoAplica ? (
+          <span style={{
+            display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 8,
+            padding: '2px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 600,
+            backgroundColor: 'var(--md-sys-color-surface-variant)', color: 'var(--md-sys-color-on-surface-variant)',
+          }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>block</span>
+            N/A
+          </span>
+        ) : itemCompleto && (
           <span className="material-symbols-outlined" style={{ color: 'var(--md-sys-color-primary)', fontSize: 20, marginLeft: 8 }}>
             check_circle
           </span>
@@ -294,7 +316,7 @@ export default function ModeloItem({
       </div>
 
       {opcoesItem.length > 0 && (
-        <div style={{ margin: '12px 0' }}>
+        <div style={{ margin: '12px 0', opacity: naoAplica ? 0.4 : 1, pointerEvents: naoAplica ? 'none' : 'auto' }}>
           <ControleTipo
             tipo={tipoItem} opcoes={opcoesItem} valor={valorItem} onChange={handleItemChange}
             onStepperClick={onStepperClick} isEditing={isEditing} onFocusItem={onFocusItem}
@@ -304,7 +326,7 @@ export default function ModeloItem({
       )}
 
       {opcoesRef.length > 0 && (
-        <div style={{ marginTop: 8, padding: 12, backgroundColor: 'var(--md-sys-color-surface-variant)', borderRadius: 12, border: '1px dashed var(--md-sys-color-outline)' }}>
+        <div style={{ marginTop: 8, padding: 12, backgroundColor: 'var(--md-sys-color-surface-variant)', borderRadius: 12, border: '1px dashed var(--md-sys-color-outline)', opacity: naoAplica ? 0.4 : 1, pointerEvents: naoAplica ? 'none' : 'auto' }}>
           <p style={{ margin: '0 0 8px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--md-sys-color-on-surface-variant)' }}>Referência</p>
           <ControleTipo
             tipo={tipoRef} opcoes={opcoesRef} valor={valorRef} onChange={handleRefChange}
@@ -341,6 +363,17 @@ export default function ModeloItem({
           </div>
         )}
 
+        {opcoesItem.length > 0 && (
+          <button
+            type="button"
+            className={`chip-btn chip-btn--sm${naoAplica ? ' chip-btn--filled' : ''}`}
+            onClick={(e) => { e.stopPropagation(); alternarNaoAplica(); }}
+            aria-pressed={naoAplica}
+            title="Marcar que este item não se aplica a este equipamento"
+          >
+            <span className="material-symbols-outlined">block</span> N/A
+          </button>
+        )}
         {onCopiarResposta && (
           <button type="button" className="chip-btn chip-btn--sm" onClick={() => onCopiarResposta(cr4a1_item)}>
             <span className="material-symbols-outlined">content_copy</span> Copiar
