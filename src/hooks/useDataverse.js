@@ -46,6 +46,21 @@ export function useDataverse() {
     return data;
   };
 
+  // O Dataverse devolve no máximo 5000 linhas por página e indica o resto em
+  // @odata.nextLink. Sem seguir esse link, consultas grandes são truncadas em
+  // silêncio — o que já esvaziou a fila de OS pendentes.
+  const callApiPaginado = async (path) => {
+    let caminho = path;
+    const linhas = [];
+    while (caminho) {
+      const data = await callApi(caminho);
+      linhas.push(...(data?.value || []));
+      const next = data?.['@odata.nextLink'];
+      caminho = next ? next.replace(/^.*\/api\/data\/v9\.2/, '') : null;
+    }
+    return linhas;
+  };
+
   const resolveEntitySet = async (logicalName) => {
     if (entitySetCache[logicalName]) return entitySetCache[logicalName];
     const res = await fetch(`${import.meta.env.VITE_API_URL}/entityset?logicalName=${encodeURIComponent(logicalName)}`);
@@ -313,21 +328,35 @@ export function useDataverse() {
 
     const baseMedroSet = await resolveEntitySet('cr4a1_base_medro');
     const zb6Set = await resolveEntitySet('cr4a1_zb6_relatorio');
+    const cabSet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
 
-    // 1. Busca as OS da base_medro na filial, setor 'PCP' (máx. 50)
-    const filterBase = `$filter=cr4a1_unidade eq '${encodeURIComponent(filial)}' and cr4a1_setor eq 'PCP'&$select=cr4a1_os_comp,cr4a1_cliente&$top=50`;
-    const dataBase = await callApi(`/${baseMedroSet}?${filterBase}`);
-    const osBase = dataBase?.value || [];
+    // 1. OS da base_medro na filial, setor 'PCP'. Sem limite artificial: um
+    // $top baixo aqui recorta a base ANTES do cruzamento com a ZB6 e esvazia
+    // a fila (as filiais têm milhares de linhas de PCP).
+    const filtroBase = `$filter=cr4a1_unidade eq '${encodeURIComponent(filial)}' and cr4a1_setor eq 'PCP'&$select=cr4a1_os_comp,cr4a1_cliente`;
+    // 2. OS da ZB6 sem data de entrada (ainda não entraram na oficina)
+    const filtroZb6 = `$filter=cr4a1_zb6_dtentr eq null&$select=cr4a1_novacoluna`;
+    // 3. OS que já têm peritagem (em andamento ou concluída) saem da fila
+    const filtroCab = `$select=cr4a1_os`;
 
-    if (osBase.length === 0) return [];
+    const [osBase, zb6, cabecalhos] = await Promise.all([
+      callApiPaginado(`/${baseMedroSet}?${filtroBase}`),
+      callApiPaginado(`/${zb6Set}?${filtroZb6}`),
+      callApiPaginado(`/${cabSet}?${filtroCab}`),
+    ]);
 
-    // 2. Busca todas as OS da ZB6 que possuem data de entrada NULA
-    const filterZb6 = `$filter=cr4a1_zb6_dtentr eq null&$select=cr4a1_novacoluna`;
-    const dataZb6 = await callApi(`/${zb6Set}?${filterZb6}`);
-    const zb6Codes = (dataZb6?.value || []).map(item => item.cr4a1_novacoluna);
+    const zb6Codes = new Set(zb6.map(i => i.cr4a1_novacoluna).filter(Boolean));
+    const jaPeritadas = new Set(cabecalhos.map(c => c.cr4a1_os).filter(Boolean));
 
-    // 3. Retorna apenas as OS da base que estão na ZB6 com dtentr nula
-    return osBase.filter(item => zb6Codes.includes(item.cr4a1_os_comp));
+    // A base_medro repete a mesma OS em várias linhas, então deduplica
+    const vistas = new Set();
+    return osBase.filter(item => {
+      const os = item.cr4a1_os_comp;
+      if (!os || vistas.has(os)) return false;
+      if (!zb6Codes.has(os) || jaPeritadas.has(os)) return false;
+      vistas.add(os);
+      return true;
+    });
   };
 
   return {
