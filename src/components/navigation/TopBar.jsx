@@ -4,12 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useGuia } from '../../contexts/GuiaContext';
 import './TopBar.css';
 
 export default function TopBar({ title, showBack = true, logoSrc, actions = [], onBack }) {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { isDark, toggleTheme, fontSize, setFontSize } = useTheme();
+  const { abrirGuia } = useGuia();
   const [showFontSlider, setShowFontSlider] = useState(false);
   const [confirmandoLogout, setConfirmandoLogout] = useState(false);
 
@@ -28,6 +30,12 @@ export default function TopBar({ title, showBack = true, logoSrc, actions = [], 
 
   const allActions = [
     ...actions,
+    // Guia do app, sempre ao alcance
+    {
+      icon: 'help',
+      onClick: abrirGuia,
+      label: 'Guia do aplicativo',
+    },
     // Toggle de tema
     {
       icon: isDark ? 'light_mode' : 'dark_mode',

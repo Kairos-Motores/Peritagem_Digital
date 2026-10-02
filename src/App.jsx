@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { SyncProvider } from './contexts/SyncContext';
 import { InspecaoProvider } from './contexts/InspecaoContext';
 import { OfflineProvider } from './contexts/OfflineContext'; // ← NOVO
+import { GuiaProvider } from './contexts/GuiaContext';
 import ToastProvider from './components/ui/ToastProvider';
 import AppRoutes from './AppRoutes';
 
@@ -13,8 +14,10 @@ function App() {
         <SyncProvider>
           <InspecaoProvider>
             <OfflineProvider>   {/* ← ENVOLVE A APLICAÇÃO */}
-              <ToastProvider />
-              <AppRoutes />
+              <GuiaProvider>
+                <ToastProvider />
+                <AppRoutes />
+              </GuiaProvider>
             </OfflineProvider>
           </InspecaoProvider>
         </SyncProvider>

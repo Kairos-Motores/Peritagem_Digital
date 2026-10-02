@@ -13,7 +13,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Logo from '../assets/Medro llogo horizontal-Medro.svg';
 import { useOffline } from '../contexts/OfflineContext';
 import { useAudioFeedback } from '../hooks/useAudioFeedback';
-import { useFirstTimeTips } from '../hooks/useFirstTimeTips';
 import { useModeloOffline } from '../hooks/useModeloOffline';
 import { salvarInspecaoOffline, obterInspecaoPorOS } from '../db/offlineStore';
 import { cabecalhoCompleto } from '../utils/cabecalho';
@@ -33,7 +32,6 @@ export default function Checklist() {
   const { salvarTipo, updateStatusCabecalho, getItensByOS, getCabecalhoByOS } = useDataverse();
   const { modoOffline } = useOffline();
   const { playSuccess, playComplete, vibrate, playClick } = useAudioFeedback();
-  const { show: showTips, markSeen } = useFirstTimeTips();
   const { itensModelo: todosItensModelo, loading: modeloLoading } = useModeloOffline();
 
   const [respostas, setRespostas] = useState({});
@@ -568,25 +566,6 @@ export default function Checklist() {
     <div
       style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}
     >
-      {showTips && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, pointerEvents: 'none' }}>
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 2 }}
-            onClick={markSeen}
-            style={{
-              position: 'fixed', bottom: 120, left: '50%', transform: 'translateX(-50%)',
-              backgroundColor: 'var(--md-sys-color-primary)', color: '#fff', border: 'none',
-              borderRadius: 20, padding: '8px 24px', fontSize: '0.85rem', fontWeight: 500,
-              cursor: 'pointer', pointerEvents: 'auto', boxShadow: 'var(--md-sys-elevation-2)', zIndex: 2001,
-            }}
-          >
-            Entendi
-          </motion.button>
-        </div>
-      )}
-
       <TopBar title={`OS: ${os}`} logoSrc={Logo} onBack={handleBack} />
       <AbaPeritagens salvarAntesDeTrocar={() => salvarAtual(tipoSelecionado)} />
       {modoOffline && (
