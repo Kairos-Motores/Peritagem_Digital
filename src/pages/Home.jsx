@@ -33,10 +33,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Pull‑to‑refresh
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const pullStart = useRef(0);
-  const mainContainerRef = useRef(null);
 
   // Estados de busca
   const [buscaAndamento, setBuscaAndamento] = useState('');
@@ -57,10 +54,12 @@ export default function Home() {
 
   // Função de busca central (colocada dentro do useEffect e guardada na ref)
   useEffect(() => {
-    const fetchData = async () => {
+    // `silencioso` = atualização pelo botão: mantém a lista na tela em vez de
+    // trocá-la pela tela de carregamento.
+    const fetchData = async (silencioso = false) => {
       try {
         if (!username) return;
-        setLoading(true);
+        if (!silencioso) setLoading(true);
 
         if (modoOffline) {
           const inspecoes = await listarPendentes();
@@ -160,16 +159,10 @@ export default function Home() {
     fetchData();
   }, [username, modoOffline]);
 
-  // Pull‑to‑refresh handlers
-  const handleTouchStart = (e) => {
-    pullStart.current = e.touches[0].clientY;
-  };
-  const handleTouchEnd = async (e) => {
-    const pullDistance = e.changedTouches[0].clientY - pullStart.current;
-    if (pullDistance > 100 && !isRefreshing && mainContainerRef.current?.scrollTop === 0) {
-      setIsRefreshing(true);
-      if (fetchDataRef.current) fetchDataRef.current();
-    }
+  const atualizar = () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    fetchDataRef.current?.(true);
   };
 
   // Handlers de toque longo (mantidos)
@@ -251,7 +244,6 @@ export default function Home() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <TopBar title="Kairós Peritagem" showBack={false} logoSrc={Logo} />
       <div
-        ref={mainContainerRef}
         className="page-content"
         style={{
           paddingBottom: 100,
@@ -260,29 +252,41 @@ export default function Home() {
           flexWrap: 'wrap',
           gap: 24,
         }}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
       >
-        {isRefreshing && (
-          <div style={{ width: '100%', textAlign: 'center', padding: 8 }}>
-            <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }}>refresh</span>
-          </div>
-        )}
-
         {/* ========== COLUNA ESQUERDA: EM ANDAMENTO ========== */}
         <div data-guia="em-andamento" style={{ flex: '1 1 55%', minWidth: 280 }}>
-          <motion.h1
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            style={{
-              color: 'var(--md-sys-color-on-background)',
-              fontSize: '1.5rem',
-              fontWeight: 600,
-            }}
-          >
-            Bem-vindo, {dadosUsuario?.cr4a1_title || username}
-          </motion.h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <motion.h1
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              style={{
+                flex: 1, minWidth: 0,
+                color: 'var(--md-sys-color-on-background)',
+                fontSize: '1.5rem',
+                fontWeight: 600,
+              }}
+            >
+              Bem-vindo, {dadosUsuario?.cr4a1_title || username}
+            </motion.h1>
+            <button
+              type="button"
+              data-guia="atualizar"
+              className="topbar-icon-btn"
+              onClick={atualizar}
+              disabled={isRefreshing}
+              aria-label="Atualizar listas"
+              title="Atualizar listas"
+              style={{ flexShrink: 0, color: 'var(--md-sys-color-primary)' }}
+            >
+              <span
+                className="material-symbols-outlined"
+                style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }}
+              >
+                refresh
+              </span>
+            </button>
+          </div>
           <div data-guia="sync">
             <SyncStatus />
           </div>

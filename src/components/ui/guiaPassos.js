@@ -33,6 +33,13 @@ export const PASSOS_GUIA = [
   },
   {
     rota: '/home',
+    alvo: '[data-guia="atualizar"]',
+    icone: 'refresh',
+    titulo: 'Atualizar as listas',
+    texto: 'Toque aqui para buscar de novo as peritagens e a fila da filial. As listas continuam na tela enquanto a busca acontece.',
+  },
+  {
+    rota: '/home',
     alvo: '[data-guia="sync"]',
     icone: 'cloud_sync',
     titulo: 'Internet e sincronização',
