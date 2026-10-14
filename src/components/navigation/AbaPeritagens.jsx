@@ -30,7 +30,7 @@ function IconeStatusOS({ status }) {
 export default function AbaPeritagens({ salvarAntesDeTrocar }) {
   const { inspecoesAbertas, osAtivo, focarAba, fecharAba, novaInspecao, retomarInspecao } = useInspecao();
   const navigate = useNavigate();
-  const { validarOS, getCabecalhoByOS, getUsuarioLogado, getCabecalhosPorFilial } = useDataverse();
+  const { validarOS, getCabecalhoByOS, getUsuarioLogado, getCabecalhosPorFilial, getFilialPeritador } = useDataverse();
   const { modoOffline, salvarLocal } = useOffline();
   const { error: toastError } = useToast();
   const username = sessionStorage.getItem('dv_username');
@@ -44,6 +44,16 @@ export default function AbaPeritagens({ salvarAntesDeTrocar }) {
   const [valStatus, setValStatus] = useState(null);
   const [clienteValidado, setClienteValidado] = useState('');
   const [mensagem, setMensagem] = useState('');
+  const [filial, setFilial] = useState(() => sessionStorage.getItem('dv_filial') || '');
+
+  // Filial do peritador logado — Aveiro valida a OS numa tabela própria
+  // (CK_Farol), então a validação precisa saber qual é.
+  useEffect(() => {
+    if (modoOffline || !username || filial) return;
+    getFilialPeritador(username).then(f => {
+      if (f) setFilial(f);
+    }).catch(() => setFilial(''));
+  }, [modoOffline, username, filial]);
 
   // Busca a lista de "em andamento" quando o modal abre
   useEffect(() => {
@@ -66,7 +76,9 @@ export default function AbaPeritagens({ salvarAntesDeTrocar }) {
     setValStatus('validando');
     const t = setTimeout(async () => {
       try {
-        const resultado = await validarOS(osInput.trim());
+        const filialAtual = filial || sessionStorage.getItem('dv_filial') || (username ? await getFilialPeritador(username) : '');
+        if (filialAtual && !filial) setFilial(filialAtual);
+        const resultado = await validarOS(osInput.trim(), filialAtual);
         setClienteValidado(resultado.cliente || '');
         if (resultado.status === 'valida') {
           setValStatus('valida');
@@ -81,7 +93,7 @@ export default function AbaPeritagens({ salvarAntesDeTrocar }) {
       }
     }, 600);
     return () => clearTimeout(t);
-  }, [osInput, modoOffline]);
+  }, [osInput, modoOffline, filial]);
 
   const fecharModal = () => {
     setModalAberto(false);

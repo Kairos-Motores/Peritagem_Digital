@@ -13,6 +13,7 @@ export default function NovaInspecao() {
   const [searchParams] = useSearchParams();
   const osFromUrl = searchParams.get('os') || '';
   const clienteFromUrl = searchParams.get('cliente') || '';
+  const filialFromUrl = searchParams.get('filial') || '';
 
   const [os, setOs] = useState(osFromUrl);
   const [valStatus, setValStatus] = useState(null);
@@ -22,18 +23,31 @@ export default function NovaInspecao() {
   const { novaInspecao } = useInspecao();
   const navigate = useNavigate();
   const { error: toastError } = useToast();
-  const { validarOS } = useDataverse();
+  const { validarOS, getFilialPeritador } = useDataverse();
   const { modoOffline, salvarLocal } = useOffline();
   const debounceRef = useRef(null);
   const inputRef = useRef(null); // ref para o input, útil se quiseres manter foco
+  const [filial, setFilial] = useState(() => filialFromUrl || sessionStorage.getItem('dv_filial') || '');
 
   const osTrim = os.trim();
+
+  // Filial do peritador logado — algumas filiais (Aveiro) validam a OS numa
+  // tabela própria (CK_Farol), então a validação precisa saber qual é.
+  useEffect(() => {
+    if (modoOffline || filial) return;
+    const username = sessionStorage.getItem('dv_username');
+    if (!username) return;
+    getFilialPeritador(username).then(f => {
+      if (f) setFilial(f);
+    }).catch(() => setFilial(''));
+  }, [modoOffline, filial]);
 
   // Atualiza os campos quando os parâmetros da URL mudam
   useEffect(() => {
     setOs(osFromUrl);
     setCliente(clienteFromUrl);
-  }, [osFromUrl, clienteFromUrl]);
+    if (filialFromUrl) setFilial(filialFromUrl);
+  }, [osFromUrl, clienteFromUrl, filialFromUrl]);
 
   // Validação online da OS (com debounce)
   useEffect(() => {
@@ -52,7 +66,10 @@ export default function NovaInspecao() {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        const resultado = await validarOS(osTrim);
+        const username = sessionStorage.getItem('dv_username');
+        const filialAtual = filial || sessionStorage.getItem('dv_filial') || (username ? await getFilialPeritador(username) : '');
+        if (filialAtual && !filial) setFilial(filialAtual);
+        const resultado = await validarOS(osTrim, filialAtual);
         setCliente(resultado.cliente || '');
         switch (resultado.status) {
           case 'valida':
@@ -77,7 +94,7 @@ export default function NovaInspecao() {
       }
     }, 600);
     return () => clearTimeout(debounceRef.current);
-  }, [osTrim, modoOffline]);
+  }, [osTrim, modoOffline, filial]);
 
   const podeProsseguir = modoOffline ? osTrim.length > 0 : valStatus === 'valida';
 

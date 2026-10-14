@@ -36,6 +36,7 @@ export function AuthProvider({ children }) {
   const logout = () => {
     sessionStorage.removeItem('dv_token');
     sessionStorage.removeItem('dv_username');
+    sessionStorage.removeItem('dv_filial');
     setUser(null);
   };
 

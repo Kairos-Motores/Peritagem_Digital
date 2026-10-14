@@ -108,8 +108,12 @@ export function useDataverse() {
 
   // Obtém a filial do peritador logado
   const getFilialPeritador = async (username) => {
+    const cached = sessionStorage.getItem('dv_filial');
+    if (cached) return cached;
     const userData = await getUsuarioLogado(username);
-    return userData?.cr4a1_filial || null;
+    const f = userData?.cr4a1_filial || null;
+    if (f) sessionStorage.setItem('dv_filial', f);
+    return f;
   };
 
   // Retorna cabeçalhos apenas da filial fornecida
@@ -323,9 +327,11 @@ export function useDataverse() {
     return res.json();
   };
 
-  const validarOS = async (os) => {
+  const validarOS = async (os, filial) => {
     const token = user?.token;
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/validar-os?os=${encodeURIComponent(os)}`, {
+    const params = new URLSearchParams({ os });
+    if (filial) params.set('filial', filial);
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/validar-os?${params.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Erro ao validar OS');
@@ -335,9 +341,35 @@ export function useDataverse() {
   const getOSPendentes = async (filial) => {
     if (!filial) return [];
 
+    // OS que já têm peritagem (em andamento ou concluída) saem da fila,
+    // qualquer que seja a filial/fonte dos dados.
+    const cabSet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
+    const cabecalhos = await callApiPaginado(`/${cabSet}?$select=cr4a1_os`);
+    const jaPeritadas = new Set(cabecalhos.map(c => c.cr4a1_os).filter(Boolean));
+
+    // Aveiro usa um sistema próprio (CK_Farol) e não depende da ZB6/base_medro
+    // brasileiras — a OS não precisa estar na ZB6 pra entrar na fila.
+    if (filial === 'Aveiro') {
+      const farolSet = await resolveEntitySet('cr4a1_ck_farol');
+      // cr4a1_datarecebiment é a data de entrada na oficina no CK_Farol — mesmo
+      // corte de 01/10/2026 usado nas outras filiais, pra não arrastar o
+      // histórico (sem o corte, a fila viria com ~1900 OS desde 2025).
+      const filtroFarol = `$filter=cr4a1_xstatus eq 'Ativo' and cr4a1_datarecebiment ge ${INICIO_USO_APP}&$select=cr4a1_os,cr4a1_nomecliente`;
+      const farol = await callApiPaginado(`/${farolSet}?${filtroFarol}`);
+
+      const vistas = new Set();
+      return farol
+        .filter(item => {
+          const os = item.cr4a1_os;
+          if (!os || vistas.has(os) || jaPeritadas.has(os)) return false;
+          vistas.add(os);
+          return true;
+        })
+        .map(item => ({ cr4a1_os_comp: item.cr4a1_os, cr4a1_cliente: item.cr4a1_nomecliente }));
+    }
+
     const baseMedroSet = await resolveEntitySet('cr4a1_base_medro');
     const zb6Set = await resolveEntitySet('cr4a1_zb6_relatorio');
-    const cabSet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
 
     // 1. OS da base_medro na filial que entraram no PCP a partir do início do
     // uso do app. Sem limite artificial: um $top baixo aqui recorta a base
@@ -345,17 +377,13 @@ export function useDataverse() {
     const filtroBase = `$filter=cr4a1_unidade eq '${encodeURIComponent(filial)}' and cr4a1_setor eq 'PCP' and cr4a1_data_inicial ge ${INICIO_USO_APP}&$select=cr4a1_os_comp,cr4a1_cliente`;
     // 2. OS da ZB6 sem data de entrada (ainda não entraram na oficina)
     const filtroZb6 = `$filter=cr4a1_zb6_dtentr eq null&$select=cr4a1_novacoluna`;
-    // 3. OS que já têm peritagem (em andamento ou concluída) saem da fila
-    const filtroCab = `$select=cr4a1_os`;
 
-    const [osBase, zb6, cabecalhos] = await Promise.all([
+    const [osBase, zb6] = await Promise.all([
       callApiPaginado(`/${baseMedroSet}?${filtroBase}`),
       callApiPaginado(`/${zb6Set}?${filtroZb6}`),
-      callApiPaginado(`/${cabSet}?${filtroCab}`),
     ]);
 
     const zb6Codes = new Set(zb6.map(i => i.cr4a1_novacoluna).filter(Boolean));
-    const jaPeritadas = new Set(cabecalhos.map(c => c.cr4a1_os).filter(Boolean));
 
     // A base_medro repete a mesma OS em várias linhas, então deduplica
     const vistas = new Set();

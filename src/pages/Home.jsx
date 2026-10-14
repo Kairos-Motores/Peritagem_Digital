@@ -81,6 +81,7 @@ export default function Home() {
         const userData = await getUsuarioLogado(username);
         setDadosUsuario(userData);
         const filial = userData?.cr4a1_filial;
+        if (filial) sessionStorage.setItem('dv_filial', filial);
 
         const [modeloItens, cabecalhos, pendentes] = await Promise.all([
           getModeloItens(),
@@ -471,7 +472,7 @@ export default function Home() {
                     whileTap={{ scale: 0.98 }}
                     onClick={() =>
                       navigate(
-                        `/nova?os=${encodeURIComponent(item.cr4a1_os_comp)}&cliente=${encodeURIComponent(item.cr4a1_cliente || '')}`
+                        `/nova?os=${encodeURIComponent(item.cr4a1_os_comp)}&cliente=${encodeURIComponent(item.cr4a1_cliente || '')}&filial=${encodeURIComponent(filial || '')}`
                       )
                     }
                     style={{
