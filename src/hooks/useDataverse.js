@@ -95,6 +95,14 @@ export function useDataverse() {
     return data?.value || [];
   };
 
+  // Glossário de termos BR -> PT (correspondência exata, pra rótulos de
+  // opção como Sim/Não/Bom/Recuperar — usado hoje só pela filial Aveiro).
+  const getGlossarioTermos = async () => {
+    const entitySet = await resolveEntitySet('cr4a1_glossariotermo');
+    const data = await callApi(`/${entitySet}?$select=cr4a1_glossariotermoid,cr4a1_termobr,cr4a1_termopt`);
+    return data?.value || [];
+  };
+
   // Modelos de peritagem ativos (cr4a1_id é a numeração automática usada
   // na coluna cr4a1_modeloperitagem da b01 e do cabeçalho)
   const getModelosPeritagem = async () => {
@@ -402,6 +410,7 @@ export function useDataverse() {
     getUsuarioLogado,
     getModeloItens,
     getModelosPeritagem,
+    getGlossarioTermos,
     getInspecoesPorOS,
     createCabecalho,
     updateCabecalho,

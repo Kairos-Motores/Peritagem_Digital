@@ -14,6 +14,7 @@ import Logo from '../assets/Medro llogo horizontal-Medro.svg';
 import { useOffline } from '../contexts/OfflineContext';
 import { useAudioFeedback } from '../hooks/useAudioFeedback';
 import { useModeloOffline } from '../hooks/useModeloOffline';
+import { useGlossario } from '../hooks/useGlossario';
 import { salvarInspecaoOffline, obterInspecaoPorOS } from '../db/offlineStore';
 import { cabecalhoCompleto } from '../utils/cabecalho';
 import { filtrarItensPorModelo } from '../utils/modelo';
@@ -76,12 +77,16 @@ export default function Checklist() {
   // peritagem dela. Ao trocar de OS, `cabecalhoValidado` volta a ser false
   // sozinho até a nova OS ser validada (o modelo, e portanto a lista de
   // itens, pode ser outro).
-  const [validacao, setValidacao] = useState({ os: null, modeloId: '' });
+  const [validacao, setValidacao] = useState({ os: null, modeloId: '', filial: '' });
   const cabecalhoValidado = !!os && validacao.os === os;
   // Modelo de peritagem gravado no cabeçalho define quais linhas da b01
   // aparecem. Vazio (peritagens antigas) = todas as linhas; linha da b01 sem
   // modelo aparece em qualquer modelo.
   const modeloPeritagemId = cabecalhoValidado ? validacao.modeloId : '';
+  // Filial da OS (vem do próprio cabeçalho, não da sessão do usuário) — usada
+  // só pra adaptar a terminologia exibida (ver utils/terminologia.js).
+  const filial = cabecalhoValidado ? validacao.filial : '';
+  const { glossario } = useGlossario();
   const itensModelo = useMemo(
     () => (cabecalhoValidado ? filtrarItensPorModelo(todosItensModelo, modeloPeritagemId) : []),
     [cabecalhoValidado, todosItensModelo, modeloPeritagemId]
@@ -91,7 +96,7 @@ export default function Checklist() {
   // (fecha o atalho de "Continuar Inspeção" indo direto pro checklist)
   useEffect(() => {
     if (!os) return;
-    const validar = (modeloId = '') => setValidacao({ os, modeloId });
+    const validar = (modeloId = '', filialCab = '') => setValidacao({ os, modeloId, filial: filialCab });
     let ativo = true;
     const bloquear = () => {
       error('Complete o cabeçalho antes de iniciar o checklist.');
@@ -101,13 +106,13 @@ export default function Checklist() {
       obterInspecaoPorOS(os).then(inspecao => {
         if (!ativo) return;
         if (!cabecalhoCompleto(inspecao?.cabecalho)) bloquear();
-        else validar(inspecao.cabecalho.cr4a1_modeloperitagem || '');
+        else validar(inspecao.cabecalho.cr4a1_modeloperitagem || '', inspecao.cabecalho.cr4a1_filial || '');
       }).catch(() => validar());
     } else {
       getCabecalhoByOS(os).then(cab => {
         if (!ativo) return;
         if (!cabecalhoCompleto(cab)) bloquear();
-        else validar(cab.cr4a1_modeloperitagem || '');
+        else validar(cab.cr4a1_modeloperitagem || '', cab.cr4a1_filial || '');
       }).catch(() => validar());
     }
     return () => { ativo = false; };
@@ -795,6 +800,8 @@ export default function Checklist() {
                 <ModeloItem
                   key={item.cr4a1_item}
                   item={item}
+                  filial={filial}
+                  glossario={glossario}
                   onChange={(resp) => handleItemChange(item.cr4a1_item, resp)}
                   initialResposta={respostas[item.cr4a1_item]}
                   onTirarFoto={handleTirarFotoItem}

@@ -12,6 +12,8 @@ import AlbumFotos from '../components/forms/AlbumFotos';
 import { useOffline } from '../contexts/OfflineContext';
 import { obterInspecaoPorOS } from '../db/offlineStore';
 import { db } from '../db/fila';
+import { useGlossario } from '../hooks/useGlossario';
+import { descricaoLocalizada, rotuloLocalizado } from '../utils/terminologia';
 import { useModelosPeritagem } from '../hooks/useModelosPeritagem';
 
 // =============== Ícones (corrigidos) ===============
@@ -95,9 +97,11 @@ const CORES_OPCAO = {
   'Fornecer': '#1565C0',
 };
 
-function ItemCard({ item, index, onViewObservacao }) {
+function ItemCard({ item, index, onViewObservacao, filial, glossario }) {
   const tipolinha = item.cr4a1_tipolinha?.toString() || '';
   const tiporeferencia = item.cr4a1_tiporeferencia?.toString() || '';
+  const tituloExibido = descricaoLocalizada(item, filial);
+  const traduzir = (termo) => rotuloLocalizado(termo, glossario, filial);
 
   // Quantidades
   const quantStr = item.cr4a1_var_quant || '';
@@ -146,7 +150,7 @@ function ItemCard({ item, index, onViewObservacao }) {
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--md-sys-color-primary)', lineHeight: 1.3, overflowWrap: 'anywhere', wordBreak: 'break-word', flex: 1 }}>
-            {item.cr4a1_descricao || item.cr4a1_item || 'Item sem nome'}
+            {tituloExibido || item.cr4a1_item || 'Item sem nome'}
           </h4>
           {item.cr4a1_naoaplica && (
             <span style={{
@@ -196,7 +200,7 @@ function ItemCard({ item, index, onViewObservacao }) {
               if (tipolinha.includes('Bool')) {
                 return (
                   <span key={idx} style={{ ...baseStyle, backgroundColor: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}>
-                    {opcao}
+                    {traduzir(opcao)}
                   </span>
                 );
               }
@@ -213,7 +217,7 @@ function ItemCard({ item, index, onViewObservacao }) {
                 style.color = 'var(--md-sys-color-on-surface-variant)';
                 style.opacity = 0.4;
               }
-              return <span key={idx} style={style}>{opcao}: {valor}</span>;
+              return <span key={idx} style={style}>{traduzir(opcao)}: {valor}</span>;
             })}
           </div>
         )}
@@ -247,7 +251,7 @@ function ItemCard({ item, index, onViewObservacao }) {
                 if (tiporeferencia.includes('Bool')) {
                   return (
                     <span key={idx} style={{ ...baseStyle, backgroundColor: 'var(--md-sys-color-tertiary-container)', color: 'var(--md-sys-color-on-tertiary-container)' }}>
-                      {opcao}
+                      {traduzir(opcao)}
                     </span>
                   );
                 }
@@ -264,7 +268,7 @@ function ItemCard({ item, index, onViewObservacao }) {
                   style.color = 'var(--md-sys-color-on-surface-variant)';
                   style.opacity = 0.4;
                 }
-                return <span key={idx} style={style}>{opcao}: {valor}</span>;
+                return <span key={idx} style={style}>{traduzir(opcao)}: {valor}</span>;
               })}
             </div>
           </div>
@@ -286,6 +290,7 @@ export default function InspecaoDetalhe() {
   const { error: toastError, success } = useToast();
   const { modoOffline } = useOffline();
   const { modelos } = useModelosPeritagem();
+  const { glossario } = useGlossario();
   const [cabecalho, setCabecalho] = useState(null);
   const [itens, setItens] = useState([]);
   const [fotos, setFotos] = useState([]);
@@ -317,7 +322,9 @@ export default function InspecaoDetalhe() {
       const modelo = modeloArray.find(m => m.cr4a1_item === item.cr4a1_item);
       const tipolinha = item.cr4a1_tipolinha || (modelo?.cr4a1_tipolinha) || '';
       const tiporeferencia = item.cr4a1_tiporeferencia || (modelo?.cr4a1_tiporeferencia) || '';
-      return { ...item, cr4a1_tipolinha: tipolinha, cr4a1_tiporeferencia: tiporeferencia };
+      // A resposta salva (b04) não tem a descrição em PT — só o modelo (b01) tem.
+      const descricaoPt = item.cr4a1_descricaopt || modelo?.cr4a1_descricaopt || '';
+      return { ...item, cr4a1_tipolinha: tipolinha, cr4a1_tiporeferencia: tiporeferencia, cr4a1_descricaopt: descricaoPt };
     });
   };
 
@@ -357,6 +364,7 @@ export default function InspecaoDetalhe() {
               base.cr4a1_peritagem_b04id = modeloItem.cr4a1_peritagem_b04id || base.cr4a1_peritagem_b04id;
               base.cr4a1_item = modeloItem.cr4a1_item;
               base.cr4a1_descricao = modeloItem.cr4a1_descricao;
+              base.cr4a1_descricaopt = modeloItem.cr4a1_descricaopt || '';
               base.cr4a1_tipo = modeloItem.cr4a1_tipo;
             }
             return base;
@@ -449,6 +457,9 @@ export default function InspecaoDetalhe() {
   const albumFotos = fotos.filter(f => /_\d+\.jpg$/.test(f.name));
 
   const modeloDaPeritagem = modelos.find(m => m.cr4a1_id === cabecalho?.cr4a1_modeloperitagem);
+  // Filial da OS (do próprio cabeçalho) — só pra adaptar a terminologia
+  // exibida nos itens (ver utils/terminologia.js).
+  const filial = cabecalho?.cr4a1_filial || '';
 
   const cabecalhoFields = cabecalho ? [
     { label: 'Cliente', value: cabecalho.cr4a1_cliente },
@@ -674,7 +685,7 @@ export default function InspecaoDetalhe() {
                 <motion.div layout style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
                   <AnimatePresence>
                     {itensVisiveis.map((item, idx) => (
-                      <ItemCard key={item.cr4a1_peritagem_b04id} item={item} index={idx} onViewObservacao={setObservacaoSelecionada} />
+                      <ItemCard key={item.cr4a1_peritagem_b04id} item={item} index={idx} onViewObservacao={setObservacaoSelecionada} filial={filial} glossario={glossario} />
                     ))}
                   </AnimatePresence>
                 </motion.div>
@@ -685,7 +696,7 @@ export default function InspecaoDetalhe() {
           <motion.div layout style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
             <AnimatePresence>
               {itensFiltrados.map((item, idx) => (
-                <ItemCard key={item.cr4a1_peritagem_b04id} item={item} index={idx} onViewObservacao={setObservacaoSelecionada} />
+                <ItemCard key={item.cr4a1_peritagem_b04id} item={item} index={idx} onViewObservacao={setObservacaoSelecionada} filial={filial} glossario={glossario} />
               ))}
             </AnimatePresence>
           </motion.div>

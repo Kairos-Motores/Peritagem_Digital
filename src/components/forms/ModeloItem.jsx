@@ -1,9 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import '@material/web/textfield/filled-text-field.js';
 import { FilledCard } from '../ui/MdCard';
+import { descricaoLocalizada, rotuloLocalizado } from '../../utils/terminologia';
 import './ModeloItem.css';
 
-function ControleTipo({ tipo, opcoes, valor, onChange, nomeRadio, onStepperClick, isEditing, onFocusItem, onBlurItem, onNextItem }) {
+// `traduzir` só troca o TEXTO exibido (ex.: "Eixo" -> "Veio" na filial
+// Aveiro) — a chave usada em `valor`/`onChange` continua a opção original,
+// pra não divergir do que é salvo no Dataverse.
+function ControleTipo({ tipo, opcoes, valor, onChange, nomeRadio, onStepperClick, isEditing, onFocusItem, onBlurItem, onNextItem, traduzir = (t) => t }) {
   const [erroNegativo, setErroNegativo] = useState(false);
 
   const partesTipo = tipo.split(';').map(s => s.trim());
@@ -34,7 +38,7 @@ function ControleTipo({ tipo, opcoes, valor, onChange, nomeRadio, onStepperClick
     const ativo = valor[opcoes[0]] > 0;
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{ativo ? opcoes[0] : opcoes[1]}</span>
+        <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{traduzir(ativo ? opcoes[0] : opcoes[1])}</span>
         <button
           type="button"
           onClick={() => {
@@ -56,7 +60,7 @@ function ControleTipo({ tipo, opcoes, valor, onChange, nomeRadio, onStepperClick
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {opcoes.map(op => (
           <div key={op} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>{op}</span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>{traduzir(op)}</span>
             <input
               type="number" inputMode="numeric" min="0" step="any"
               value={valor[op] || ''}
@@ -90,7 +94,7 @@ function ControleTipo({ tipo, opcoes, valor, onChange, nomeRadio, onStepperClick
             <input type="radio" name={nomeRadio || `radio-${opcoes.join('-')}`} checked={valor[op] > 0}
               onChange={() => { const novo = {}; opcoes.forEach(o => (novo[o] = 0)); novo[op] = 1; handleValidChange(novo); }}
               style={{ accentColor: 'var(--md-sys-color-primary)' }} />
-            <span style={{ fontSize: '0.85rem' }}>{op}</span>
+            <span style={{ fontSize: '0.85rem' }}>{traduzir(op)}</span>
           </label>
         ))}
       </div>
@@ -107,7 +111,7 @@ function ControleTipo({ tipo, opcoes, valor, onChange, nomeRadio, onStepperClick
               <input type="checkbox" checked={valor[op] > 0}
                 onChange={() => { const novo = { ...valor }; novo[op] = novo[op] > 0 ? 0 : 1; handleValidChange(novo); }}
                 style={{ accentColor: 'var(--md-sys-color-primary)' }} />
-              <span style={{ fontSize: '0.8rem' }}>{op}</span>
+              <span style={{ fontSize: '0.8rem' }}>{traduzir(op)}</span>
             </label>
             {valor[op] > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -139,7 +143,7 @@ function ControleTipo({ tipo, opcoes, valor, onChange, nomeRadio, onStepperClick
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       {opcoes.map(op => (
         <div key={op} style={{ display: 'flex', alignItems: 'center', gap: 4, backgroundColor: 'var(--md-sys-color-surface-variant)', borderRadius: 16, padding: '2px 12px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>{op}</span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>{traduzir(op)}</span>
           <button type="button" className="stepper-btn" onClick={() => { onStepperClick?.(); const novo = { ...valor, [op]: Math.max(0, (valor[op] || 0) - 1) }; handleValidChange(novo); }}>−</button>
           <input
             type="number" inputMode="numeric" min="0"
@@ -181,12 +185,20 @@ export default function ModeloItem({
   onViewFoto,
   onRemoveFoto, // agora recebida corretamente
   fotosCount = 0, // novo: contagem de fotos para este item
+  filial, // filial do cabeçalho — Aveiro troca a terminologia exibida
+  glossario, // Map termo BR -> PT (ver useGlossario)
   ...rest
 }) {
   const {
     cr4a1_item, cr4a1_descricao, cr4a1_var_quant,
     cr4a1_referencia: refOpcoesStr, cr4a1_tipolinha, cr4a1_tiporeferencia, cr4a1_tipo,
   } = item;
+
+  const tituloExibido = descricaoLocalizada(item, filial);
+  const traduzirOpcao = useCallback(
+    (op) => rotuloLocalizado(op, glossario, filial),
+    [glossario, filial]
+  );
 
   const opcoesItem = cr4a1_var_quant ? cr4a1_var_quant.split(';').map(s => s.trim()).filter(Boolean) : [];
   const tipoItem = cr4a1_tipolinha ? cr4a1_tipolinha.trim() : '';
@@ -293,7 +305,7 @@ export default function ModeloItem({
             margin: '0 0 2px', color: 'var(--md-sys-color-on-surface)', fontSize: '0.95rem',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
           }}>
-            {cr4a1_descricao}
+            {tituloExibido}
           </h4>
           {isEditing && (
             <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--md-sys-color-primary)', flexShrink: 0 }} />
@@ -320,7 +332,7 @@ export default function ModeloItem({
           <ControleTipo
             tipo={tipoItem} opcoes={opcoesItem} valor={valorItem} onChange={handleItemChange}
             onStepperClick={onStepperClick} isEditing={isEditing} onFocusItem={onFocusItem}
-            onBlurItem={onBlurItem} onNextItem={onNextItem}
+            onBlurItem={onBlurItem} onNextItem={onNextItem} traduzir={traduzirOpcao}
           />
         </div>
       )}
@@ -330,7 +342,7 @@ export default function ModeloItem({
           <p style={{ margin: '0 0 8px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--md-sys-color-on-surface-variant)' }}>Referência</p>
           <ControleTipo
             tipo={tipoRef} opcoes={opcoesRef} valor={valorRef} onChange={handleRefChange}
-            nomeRadio={`ref-radio-${cr4a1_item}`}
+            nomeRadio={`ref-radio-${cr4a1_item}`} traduzir={traduzirOpcao}
           />
         </div>
       )}
