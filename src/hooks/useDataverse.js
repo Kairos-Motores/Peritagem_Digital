@@ -136,6 +136,18 @@ export function useDataverse() {
 
   const createCabecalho = async (dados) => {
     const entitySet = await resolveEntitySet('cr4a1_peritagem_cabecalho');
+    const idField = `${entitySet}id`;
+    const filter = `$filter=cr4a1_os eq '${encodeURIComponent(dados.cr4a1_os)}'&$orderby=createdon asc`;
+
+    // Uma OS só pode ter um cabeçalho. Se já existe (duplo toque, resposta
+    // que se perdeu e o peritador tentou de novo, outro aparelho), atualiza o
+    // existente em vez de criar um segundo.
+    const jaExiste = await callApi(`/${entitySet}?${filter}`);
+    const existenteId = jaExiste?.value?.[0]?.[idField];
+    if (existenteId) {
+      await callApi(`/${entitySet}(${existenteId})`, 'PATCH', dados);
+      return existenteId;
+    }
 
     // Monta o payload com data de início automática e status inicial
     const payload = {
@@ -152,9 +164,7 @@ export function useDataverse() {
     await callApi(`/${entitySet}`, 'POST', payload);
 
     // Busca o registro pela OS para obter o ID
-    const filter = `$filter=cr4a1_os eq '${encodeURIComponent(dados.cr4a1_os)}'`;
     const search = await callApi(`/${entitySet}?${filter}`);
-    const idField = `${entitySet}id`;
     return search?.value?.[0]?.[idField];
   };
 

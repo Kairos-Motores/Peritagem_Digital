@@ -54,15 +54,22 @@ export function SyncProvider({ children }) {
           // numa nova tentativa depois de uma falha parcial.
           let cabecalho = inspecao.cabecalho;
           if (cabecalho && !cabecalho.cr4a1_peritagem_cabecalhoid) {
-            await callDataverse(
-              'POST',
-              '/cr4a1_peritagem_cabecalhoes',
-              { ...cabecalho, cr4a1_data_peritagem: new Date().toISOString(), cr4a1_status: 'Em andamento' },
-              { atualizarDataInicio: true }
-            );
+            const filtroOS = `/cr4a1_peritagem_cabecalhoes?$filter=cr4a1_os eq '${encodeURIComponent(inspecao.os)}'&$orderby=createdon asc`;
+            // Se um envio anterior falhou depois do POST (ex.: caiu antes de
+            // guardar o ID), o cabeçalho já existe no Dataverse — reaproveita
+            // em vez de criar outro.
+            const jaExiste = await callDataverse('GET', filtroOS);
+            if (!jaExiste?.value?.[0]) {
+              await callDataverse(
+                'POST',
+                '/cr4a1_peritagem_cabecalhoes',
+                { ...cabecalho, cr4a1_data_peritagem: new Date().toISOString(), cr4a1_status: 'Em andamento' },
+                { atualizarDataInicio: true }
+              );
+            }
             // O Dataverse não devolve o registro criado no POST — busca o
             // ID pela OS, igual ao fluxo online (useDataverse.createCabecalho).
-            const busca = await callDataverse('GET', `/cr4a1_peritagem_cabecalhoes?$filter=cr4a1_os eq '${encodeURIComponent(inspecao.os)}'`);
+            const busca = jaExiste?.value?.[0] ? jaExiste : await callDataverse('GET', filtroOS);
             const cabecalhoId = busca?.value?.[0]?.cr4a1_peritagem_cabecalhoid;
             if (cabecalhoId) {
               cabecalho = { ...cabecalho, cr4a1_peritagem_cabecalhoid: cabecalhoId };

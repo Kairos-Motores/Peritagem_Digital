@@ -271,6 +271,8 @@ export default function Cabecalho() {
   const [stepIndex, setStepIndex] = useState(0);
   const [maxStepReached, setMaxStepReached] = useState(0);
   const [buscandoDados, setBuscandoDados] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const enviandoRef = useRef(false);
   // Depois que o modelo foi gravado no cabeçalho ele não muda mais: o
   // checklist já pode ter respostas de linhas que só existem naquele modelo.
   const [modeloTravado, setModeloTravado] = useState(false);
@@ -446,10 +448,15 @@ export default function Cabecalho() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Trava contra duplo toque: o estado só atualiza no próximo render, então
+    // dois toques seguidos passariam os dois e criariam dois cabeçalhos.
+    if (enviandoRef.current) return;
     if (!formCompleto) {
       error('Preencha todos os campos do cabeçalho antes de continuar.');
       return;
     }
+    enviandoRef.current = true;
+    setEnviando(true);
     // Garante que a inspeção atual existe no contexto antes de prosseguir
     if (!inspecaoAtual) {
       if (!os) {
@@ -482,6 +489,9 @@ export default function Cabecalho() {
       navigate('/checklist', { replace: true });
     } catch (err) {
       error('Erro ao salvar cabeçalho. ' + err.message);
+    } finally {
+      enviandoRef.current = false;
+      setEnviando(false);
     }
   };
 
@@ -690,8 +700,8 @@ export default function Cabecalho() {
               Próximo
             </FilledButton>
           ) : (
-            <FilledButton type="submit" disabled={!formCompleto} style={{ flex: 2 }}>
-              {formCompleto ? 'Salvar e Iniciar Checklist' : 'Preencha todos os campos'}
+            <FilledButton type="submit" disabled={!formCompleto || enviando} style={{ flex: 2 }}>
+              {enviando ? 'Salvando...' : formCompleto ? 'Salvar e Iniciar Checklist' : 'Preencha todos os campos'}
             </FilledButton>
           )}
         </div>
