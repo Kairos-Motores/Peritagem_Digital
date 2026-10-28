@@ -127,6 +127,148 @@ export default function Checklist() {
 
   useEffect(() => { if (dirty) setLastModified(new Date()); }, [dirty]);
 
+  // Salvamento automático por item. Cada alteração entra numa fila (por OS) e
+  // é gravada em segundo plano ~1,5s depois, sem esperar o peritador trocar de
+  // tipo ou clicar em "Salvar". A fila guarda a própria resposta (não só o id),
+  // então continua válida mesmo se ele trocar de OS antes de gravar. Se a
+  // gravação falhar, o que não foi enviado volta pra fila e é tentado de novo.
+  const pendentesRef = useRef(new Map()); // os -> Map(item_id -> resposta)
+  const filaRef = useRef(Promise.resolve());
+  const timerSalvarRef = useRef(null);
+  const timerRetryRef = useRef(null);
+  const statusSalvamentoRef = useRef('ocioso');
+  const salvarTipoRef = useRef(salvarTipo);
+  const modoOfflineRef = useRef(modoOffline);
+  const osAtualRef = useRef(os);
+  const [statusSalvamento, setStatusSalvamento] = useState('ocioso'); // 'ocioso' | 'salvando' | 'salvo' | 'erro'
+
+  useEffect(() => {
+    salvarTipoRef.current = salvarTipo;
+    modoOfflineRef.current = modoOffline;
+    osAtualRef.current = os;
+  });
+
+  const mudarStatusSalvamento = (status) => {
+    statusSalvamentoRef.current = status;
+    setStatusSalvamento(status);
+  };
+
+  const totalPendentes = () => {
+    let total = 0;
+    pendentesRef.current.forEach(itens => { total += itens.size; });
+    return total;
+  };
+
+  const executarSalvamento = async () => {
+    const lote = pendentesRef.current;
+    if (lote.size === 0) return 'nada';
+    pendentesRef.current = new Map();
+    mudarStatusSalvamento('salvando');
+    try {
+      for (const [osLote, itens] of lote) {
+        const respostasLote = [...itens.values()];
+        if (modoOfflineRef.current) {
+          const existente = await obterInspecaoPorOS(osLote);
+          const respostasSalvas = { ...(existente?.respostas || {}) };
+          respostasLote.forEach(r => { respostasSalvas[r.item_id] = r; });
+          await salvarInspecaoOffline({
+            ...(existente || {}),
+            os: osLote,
+            cabecalho: existente?.cabecalho || {},
+            respostas: respostasSalvas,
+            fotos: existente?.fotos || [],
+          });
+        } else {
+          await salvarTipoRef.current(osLote, respostasLote);
+        }
+        if (osLote === osAtualRef.current) {
+          const tiposLote = respostasLote.map(r => r.tipo).filter(Boolean);
+          setTiposSalvos(prev => [...new Set([...prev, ...tiposLote])]);
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao salvar respostas:', err);
+      // Devolve o lote à fila sem sobrescrever o que foi editado de novo.
+      lote.forEach((itens, osLote) => {
+        const atuais = pendentesRef.current.get(osLote) || new Map();
+        itens.forEach((resposta, itemId) => { if (!atuais.has(itemId)) atuais.set(itemId, resposta); });
+        pendentesRef.current.set(osLote, atuais);
+      });
+      if (statusSalvamentoRef.current !== 'erro') {
+        error('Não foi possível salvar. Suas respostas estão guardadas e serão reenviadas automaticamente.');
+      }
+      mudarStatusSalvamento('erro');
+      clearTimeout(timerRetryRef.current);
+      timerRetryRef.current = setTimeout(() => { salvarPendentes().catch(() => {}); }, 8000);
+      throw err;
+    }
+    if (totalPendentes() === 0) setDirty(false);
+    mudarStatusSalvamento('salvo');
+    return 'salvo';
+  };
+
+  // Grava tudo que está pendente agora. Rejeita se a gravação falhar.
+  const salvarPendentes = () => {
+    clearTimeout(timerSalvarRef.current);
+    clearTimeout(timerRetryRef.current);
+    timerSalvarRef.current = null;
+    const tarefa = filaRef.current.then(executarSalvamento);
+    filaRef.current = tarefa.catch(() => {});
+    return tarefa;
+  };
+
+  const registrarAlteracao = (osItem, resposta) => {
+    let itens = pendentesRef.current.get(osItem);
+    if (!itens) {
+      itens = new Map();
+      pendentesRef.current.set(osItem, itens);
+    }
+    itens.set(resposta.item_id, resposta);
+    setDirty(true);
+    if (!timerSalvarRef.current) {
+      timerSalvarRef.current = setTimeout(() => {
+        timerSalvarRef.current = null;
+        salvarPendentes().catch(() => {});
+      }, 1500);
+    }
+  };
+
+  // Marca como pendentes todas as respostas já preenchidas (botão "Salvar" e
+  // "Concluir"), pra regravar mesmo o que já tinha sido salvo antes.
+  const marcarRespostasParaSalvar = (itens) => {
+    itens.forEach(item => {
+      const resposta = respostas[item.cr4a1_item];
+      if (resposta) registrarAlteracao(os, resposta);
+    });
+  };
+
+  // Não deixa perder o que ainda não foi gravado ao ocultar a aba (celular
+  // bloqueado, troca de app) ou ao sair da tela.
+  useEffect(() => {
+    const gravarAoOcultar = () => {
+      if (document.visibilityState === 'hidden') salvarPendentes().catch(() => {});
+    };
+    const gravarAoSair = () => { salvarPendentes().catch(() => {}); };
+    document.addEventListener('visibilitychange', gravarAoOcultar);
+    window.addEventListener('pagehide', gravarAoSair);
+    return () => {
+      document.removeEventListener('visibilitychange', gravarAoOcultar);
+      window.removeEventListener('pagehide', gravarAoSair);
+      salvarPendentes().catch(() => {});
+    };
+  }, []);
+
+  // Respostas ainda não gravadas da OS têm prioridade sobre o que veio do
+  // banco, pra um recarregamento da lista não apagar o que o peritador acabou
+  // de digitar.
+  const sobreporPendentes = (base) => {
+    const pendentes = pendentesRef.current.get(os);
+    if (!pendentes) return base;
+    const resultado = { ...base };
+    pendentes.forEach((resposta, itemId) => { resultado[itemId] = resposta; });
+    return resultado;
+  };
+
   const isRespostaCompleta = (resposta) => {
     if (!resposta) return false;
     if (resposta.naoAplica) return true;
@@ -141,7 +283,7 @@ export default function Checklist() {
     if (modoOffline) {
       obterInspecaoPorOS(os).then(inspecao => {
         if (inspecao) {
-          setRespostas(inspecao.respostas || {});
+          setRespostas(sobreporPendentes(inspecao.respostas || {}));
           const tiposPersistidos = new Set();
           Object.values(inspecao.respostas || {}).forEach(r => {
             const modeloItem = itensModelo.find(m => m.cr4a1_item === r.item_id);
@@ -192,7 +334,7 @@ export default function Checklist() {
         const modeloItem = itensModelo.find(m => m.cr4a1_item === item.cr4a1_item);
         if (modeloItem) tiposPersistidos.add(modeloItem.cr4a1_tipo);
       });
-      setRespostas(respostasIniciais);
+      setRespostas(sobreporPendentes(respostasIniciais));
       setTiposSalvos([...tiposPersistidos]);
       const tipos = [...new Set(itensModelo.map(i => i.cr4a1_tipo).filter(Boolean))];
       if (tipos.length > 0 && !tipoSelecionado) setTipoSelecionado(tipos[0]);
@@ -246,51 +388,66 @@ export default function Checklist() {
     return { completos, total, percentual: total > 0 ? Math.round((completos / total) * 100) : 0 };
   }, [itensFiltrados, respostas]);
 
+  // Resposta-base de um item ainda sem nenhuma resposta. Sem isso, "Marcar
+  // todos OK" e "Copiar" criavam a resposta sem item_id/tipo/descrição.
+  const respostaBase = (item) => ({
+    item_id: item.cr4a1_item,
+    descricao: item.cr4a1_descricao || '',
+    tipo: item.cr4a1_tipo,
+    tipolinha: item.cr4a1_tipolinha,
+    observacao: '',
+    quantidades: {},
+    referencia: {},
+    naoAplica: false,
+    peritador: inspecaoAtual?.peritador || '',
+  });
+
   const marcarTodosComoOK = () => {
     if (!tipoSelecionado) return;
     const novosValores = { ...respostas };
     itensFiltrados.forEach(item => {
       if (!respostas[item.cr4a1_item]?.completo) {
+        const atual = respostas[item.cr4a1_item] || respostaBase(item);
         const opcoes = item.cr4a1_var_quant ? item.cr4a1_var_quant.split(';').map(s => s.trim()).filter(Boolean) : [];
         const primeiraOpcao = opcoes[0] || 'Bom';
-        const quantidades = { ...respostas[item.cr4a1_item]?.quantidades };
+        const quantidades = { ...atual.quantidades };
         opcoes.forEach(op => { quantidades[op] = op === primeiraOpcao ? 1 : 0; });
-        novosValores[item.cr4a1_item] = {
-          ...respostas[item.cr4a1_item],
+        const nova = {
+          ...atual,
           quantidades,
-          referencia: respostas[item.cr4a1_item]?.referencia || {},
-          observacao: respostas[item.cr4a1_item]?.observacao || '',
+          referencia: atual.referencia || {},
+          observacao: atual.observacao || '',
           completo: true,
         };
+        novosValores[item.cr4a1_item] = nova;
+        registrarAlteracao(os, nova);
       }
     });
     setRespostas(novosValores);
-    setDirty(true);
     info('Itens marcados como OK!');
   };
 
   const handleItemChange = (item_id, resposta) => {
     const completo = isRespostaCompleta(resposta);
-    setRespostas(prev => ({
-      ...prev,
-      [item_id]: { ...resposta, peritador: inspecaoAtual?.peritador || '', completo },
-    }));
+    const nova = { ...resposta, item_id, peritador: inspecaoAtual?.peritador || '', completo };
+    setRespostas(prev => ({ ...prev, [item_id]: nova }));
     setUltimaResposta(resposta);
-    setDirty(true);
+    registrarAlteracao(os, nova);
   };
 
   const handleCopiarResposta = (itemId) => {
     if (!ultimaResposta) return;
-    setRespostas(prev => ({
-      ...prev,
-      [itemId]: {
-        ...prev[itemId],
-        quantidades: { ...ultimaResposta.quantidades },
-        referencia: { ...ultimaResposta.referencia },
-        observacao: ultimaResposta.observacao,
-      },
-    }));
-    setDirty(true);
+    const itemModelo = itensModelo.find(i => i.cr4a1_item === itemId);
+    const atual = respostas[itemId] || (itemModelo ? respostaBase(itemModelo) : { item_id: itemId });
+    const copiada = {
+      ...atual,
+      quantidades: { ...ultimaResposta.quantidades },
+      referencia: { ...ultimaResposta.referencia },
+      observacao: ultimaResposta.observacao,
+    };
+    copiada.completo = isRespostaCompleta(copiada);
+    setRespostas(prev => ({ ...prev, [itemId]: copiada }));
+    registrarAlteracao(os, copiada);
     info('Resposta copiada!');
   };
 
@@ -334,55 +491,14 @@ export default function Checklist() {
     });
   };
 
-  const salvarAtual = async (tipo) => {
-    if (!tipo || !os) return;
-    const respostasTipo = itensModelo
-      .filter(item => item.cr4a1_tipo === tipo && respostas[item.cr4a1_item])
-      .map(item => respostas[item.cr4a1_item]);
-    if (respostasTipo.length === 0) return;
-    try {
-      if (modoOffline) {
-        const existente = await obterInspecaoPorOS(os);
-        // Constrói array de fotos a partir do estado
-        const todasFotos = [];
-        Object.entries(fotos).forEach(([itemId, fotosArr]) => {
-          fotosArr.forEach(foto => {
-            todasFotos.push({
-              id: foto.id,
-              itemId,
-              url: foto.thumbnail,
-              name: foto.nome,
-              base64: foto.thumbnail,
-              nomeArquivo: foto.nome,
-            });
-          });
-        });
-        const dados = {
-          os,
-          cabecalho: existente?.cabecalho || {},
-          respostas: { ...(existente?.respostas || {}), ...respostas },
-          fotos: todasFotos,
-        };
-        await salvarInspecaoOffline(dados);
-        setTiposSalvos(prev => [...new Set([...prev, tipo])]);
-        setDirty(false);
-      } else {
-        await salvarTipo(os, respostasTipo);
-        setTiposSalvos(prev => [...new Set([...prev, tipo])]);
-        setDirty(false);
-      }
-    } catch (err) {
-      console.error('Erro ao salvar tipo em background:', err);
-    }
-  };
-
   const handleMudarTipo = (novoTipo) => {
     if (tipoSelecionado && tipoSelecionado !== novoTipo) {
-      salvarAtual(tipoSelecionado).then(() => {
+      salvarPendentes().then((resultado) => {
+        if (resultado !== 'salvo') return;
         playSuccess();
         setSalvoBg(true);
         setTimeout(() => setSalvoBg(false), 1500);
-      });
+      }).catch(() => {});
     }
     setTipoSelecionado(novoTipo);
     setTimeout(() => {
@@ -414,10 +530,16 @@ export default function Checklist() {
   const handleSalvarTipo = async () => {
     if (!tipoSelecionado || !os) return;
     setSalvando(true);
-    await salvarAtual(tipoSelecionado);
-    setSalvando(false);
-    playSuccess();
-    success(`Tipo "${tipoSelecionado}" salvo!`);
+    marcarRespostasParaSalvar(itensFiltrados);
+    try {
+      await salvarPendentes();
+      playSuccess();
+      success(`Tipo "${tipoSelecionado}" salvo!`);
+    } catch {
+      // o aviso de erro já foi exibido por executarSalvamento
+    } finally {
+      setSalvando(false);
+    }
   };
 
   const handleConcluir = async () => {
@@ -425,16 +547,17 @@ export default function Checklist() {
       error('Preencha todos os itens de cada tipo.');
       return;
     }
+    marcarRespostasParaSalvar(itensModelo);
+    try {
+      await salvarPendentes();
+    } catch {
+      // Não conclui com respostas sem gravar (o aviso já foi exibido).
+      return;
+    }
     if (modoOffline) {
-      for (const tipo of tipos) {
-        await salvarAtual(tipo);
-      }
       success('Inspeção salva offline! Será sincronizada quando houver rede.');
       navigate('/home');
       return;
-    }
-    for (const tipo of tipos) {
-      await salvarAtual(tipo);
     }
     try {
       if (inspecaoAtual.cabecalhoId) await updateStatusCabecalho(inspecaoAtual.cabecalhoId, 'Concluída');
@@ -574,7 +697,7 @@ export default function Checklist() {
       style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--md-sys-color-surface)' }}
     >
       <TopBar title={`OS: ${os}`} logoSrc={Logo} onBack={handleBack} />
-      <AbaPeritagens salvarAntesDeTrocar={() => salvarAtual(tipoSelecionado)} />
+      <AbaPeritagens salvarAntesDeTrocar={salvarPendentes} />
       {modoOffline && (
         <div style={{ padding: '8px 16px', backgroundColor: 'var(--md-sys-color-error-container)', color: 'var(--md-sys-color-on-error-container)', fontSize: '0.8rem' }}>
           Modo offline – as alterações serão sincronizadas quando houver conexão.
@@ -604,6 +727,23 @@ export default function Checklist() {
             </>
           ) : (
             <span style={{ color: 'var(--md-sys-color-on-surface-variant)', fontWeight: 400 }}>Tipos, progresso e busca</span>
+          )}
+          {statusSalvamento !== 'ocioso' && (
+            <span
+              role="status"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 4, fontSize: '0.75rem', fontWeight: 400,
+                color: statusSalvamento === 'erro' ? 'var(--md-sys-color-error)' : 'var(--md-sys-color-on-surface-variant)',
+              }}
+            >
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: 16, animation: statusSalvamento === 'salvando' ? 'spin 1s linear infinite' : 'none' }}
+              >
+                {statusSalvamento === 'salvando' ? 'sync' : statusSalvamento === 'erro' ? 'cloud_off' : 'cloud_done'}
+              </span>
+              {statusSalvamento === 'salvando' ? 'Salvando…' : statusSalvamento === 'erro' ? 'Falha ao salvar, tentando de novo' : 'Salvo'}
+            </span>
           )}
         </span>
         <span
